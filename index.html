@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trò chơi Tái Sinh - Luân Hồi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --panel-handle-height: 40px;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3e9d2;
+            color: #3a2c20;
+            display: flex;
+            flex-direction: column;
+            align-items: center; 
+            min-height: 100vh;
+            margin: 0;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        .main-header {
+            text-align: center;
+            margin-bottom: 20px;
+            width: 100%;
+        }
+        .main-header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #5d4037;
+        }
+        .main-header p {
+            font-size: 0.9rem;
+            color: #8c6b4f;
+        }
+        .loading-screen, .full-screen-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #f3e9d2; 
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 200;
+        }
+        .full-screen-overlay {
+            background-color: rgba(0,0,0,0.75);
+            z-index: 100; 
+        }
+        .loading-spinner {
+            border: 8px solid #c8a07d; 
+            border-top: 8px solid #8c6b4f; 
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin-loader 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin-loader {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .overlay-content {
+            background-color: #fff8e1; padding: 30px; border-radius: 10px;
+            text-align: center; box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            border: 3px solid #b08d57;
+            color: #3a2c20;
+            max-width: 90%;
+            width: 400px;
+        }
+        .overlay-content h2 { color: #5d4037; margin-bottom: 20px; }
+        .overlay-content label { color: #5d4037; display: block; margin-bottom: 5px; text-align: left;}
+        .overlay-content input[type="text"] {
+            width: 100%; padding: 8px; border-radius: 5px;
+            border: 1px solid #b08d57; text-align: left; margin-bottom:10px;
+        }
+        .overlay-content button {
+            margin-top: 15px; background-color: #8c6b4f; color: white;
+            padding: 10px 20px; border: none; border-radius: 8px;
+            font-size: 1rem; cursor: pointer;
+        }
+        
+        .game-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            width: 100%;
+        }
+
+        #playerListArea {
+            width: 100%;
+            flex-grow: 1;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+        }
+
+        .player-card {
+            background-color: #fff8e1;
+            border: 2px solid #b08d57;
+            border-radius: 8px;
+            padding: 15px;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .player-card.current-turn-highlight {
+            background-color: #fef9c3;
+            border-color: #f59e0b;
+            box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
+        }
+
+        .player-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #d7c8a0;
+        }
+        .player-info { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .player-icon { font-size: 1.5rem; }
+        .player-name-pos { display: flex; flex-direction: column; align-items: flex-start; }
+        .player-name { font-size: 1.1rem; font-weight: 600; color: #5d4037; }
+        .player-position-text { font-size: 0.8rem; color: #8c6b4f; }
+        .player-merit { font-size: 0.9rem; font-weight: bold; color: #2e7d32; }
+        
+        .history-label { font-size: 0.8rem; font-weight: 600; color: #8c6b4f; text-transform: uppercase; margin: 10px 0 5px 0; }
+        .history-rolls { display: flex; flex-wrap: wrap; gap: 8px; min-height: 30px; }
+        .roll-item {
+            background-color: #efebe9;
+            border: 1px solid #d7ccc8;
+            border-radius: 5px;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1rem;
+            color: #3e2723;
+        }
+        .special-roll { background-color: #ffcdd2; color: #c62828; border-color: #ef9a9a; }
+        .manual-move { background-color: #ffcdd2; color: #c62828; border-color: #ef9a9a; }
+        .good-roll { background-color: #c8e6c9; color: #2e7d32; border-color: #a5d6a7; }
+
+        /* Realm Colors */
+        .realm-hell { background-color: #ef9a9a; color: #b71c1c; }
+        .realm-preta { background-color: #ffcc80; color: #e65100; }
+        .realm-animal { background-color: #bdbdbd; color: #424242; }
+        .realm-human { background-color: #fff59d; color: #f57f17; }
+        .realm-asura { background-color: #a5d6a7; color: #1b5e20; }
+        .realm-deva { background-color: #81c784; color: #1b5e20; }
+        .realm-vajrayana { background-color: #ce93d8; color: #4a148c; }
+        .realm-mahayana { background-color: #f48fb1; color: #880e4f; }
+        .realm-hinayana { background-color: #80deea; color: #006064; }
+        .realm-nonbuddhist { background-color: #212121; color: white; }
+
+        #controlPanel {
+            width: 100%;
+            background-color: #fff8e1;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.3);
+            border: 2px solid #b08d57;
+            text-align: center;
+        }
+        
+        #playerTurnDisplay { font-weight: bold; font-size: 1.2rem; margin-bottom: 10px; color: #5d4037; }
+        
+        .dice-container {
+            width: 50px;
+            height: 50px;
+            margin: 0 auto 15px auto;
+            perspective: 600px;
+            position: relative;
+        }
+
+        #diceResultDisplay {
+            width: 100%; height: 100%; border: 2px solid #a07c5c; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2rem; font-weight: bold; color: #5d4037;
+            background-color: #efebe9; position: absolute; backface-visibility: hidden;
+        }
+
+        .dice-cube {
+            width: 100%; height: 100%; position: absolute; transform-style: preserve-3d; display: none;
+        }
+        .dice-cube.is-rolling { display: block; animation: spin 1.5s linear 1; }
+        .dice-cube .face {
+            position: absolute; width: 50px; height: 50px; background-color: #fff;
+            border: 2px solid #5d4037; display: flex; align-items: center;
+            justify-content: center; font-size: 1.8rem; color: #5d4037;
+            font-weight: bold; opacity: 0.95;
+        }
+        .face.front  { transform: translateZ(25px); } .face.back   { transform: rotateY(180deg) translateZ(25px); }
+        .face.right  { transform: rotateY(90deg) translateZ(25px); } .face.left   { transform: rotateY(-90deg) translateZ(25px); }
+        .face.top    { transform: rotateX(90deg) translateZ(25px); } .face.bottom { transform: rotateX(-90deg) translateZ(25px); }
+
+        @keyframes spin {
+            0% { transform: rotateX(0deg) rotateY(0deg); }
+            100% { transform: rotateX(720deg) rotateY(1080deg); }
+        }
+
+        .main-actions { display: flex; justify-content: center; gap: 10px; }
+        #rollDiceBtn, #skipTurnBtn {
+            background-color: #8c6b4f; color: white; padding: 10px 20px;
+            border: none; border-radius: 8px; font-size: 1rem; cursor: pointer;
+            transition: background-color 0.3s; box-shadow: 0 4px #5d4037;
+        }
+        #skipTurnBtn { background-color: #a1887f; box-shadow: 0 4px #795548; }
+        #rollDiceBtn:hover { background-color: #a07c5c; }
+        #rollDiceBtn:active, #skipTurnBtn:active { transform: translateY(2px); box-shadow: 0 2px #5d4037; }
+        #rollDiceBtn:disabled, #skipTurnBtn:disabled { background-color: #cccccc; cursor: not-allowed; box-shadow: 0 4px #999999; }
+        
+        .section-divider {
+            border-top: 2px solid #d7c8a0; margin-top: 15px; padding-top: 15px;
+        }
+        .merit-display { font-size: 1rem; margin-bottom: 10px; }
+        .merit-display span { font-weight: bold; font-size: 1.1rem; color: #2e7d32; }
+        .controls-group { display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .radio-group { display: flex; gap: 10px; }
+        .radio-group label {
+            padding: 5px 10px; border: 1px solid #b08d57; border-radius: 5px;
+            cursor: pointer; user-select: none;
+        }
+        .radio-group input[type="radio"] { display: none; }
+        .radio-group input[type="radio"]:checked + label {
+            background-color: #a07c5c; color: white;
+        }
+        .number-input {
+            width: 70px; text-align: center; font-weight: bold;
+            border: 1px solid #b08d57; border-radius: 5px; padding: 5px;
+        }
+        .action-buttons { display: flex; justify-content: center; gap: 10px; }
+        .action-buttons button {
+            padding: 8px 12px; border-radius: 6px; border: none;
+            cursor: pointer; color: white; font-size: 0.9rem;
+        }
+        #updateMeritBtn { background-color: #2e7d32; box-shadow: 0 3px #1b5e20; }
+        #specialDiceBtn { background-color: #4a90e2; box-shadow: 0 3px #357ABD; }
+        #movePlayerBtn { background-color: #f57c00; box-shadow: 0 3px #e65100; }
+        #leaveGameBtn { background-color: #d32f2f; box-shadow: 0 3px #b71c1c; margin-top: 15px; }
+
+        #panelToggleButton {
+            display: none; /* Hidden by default, shown only on mobile */
+            width: 100px;
+            height: var(--panel-handle-height);
+            background-color: #a07c5c;
+            border: none;
+            border-radius: 10px 10px 0 0;
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translate(-50%, -100%);
+            cursor: pointer;
+        }
+        #panelToggleButton svg {
+            width: 24px;
+            height: 24px;
+            stroke: white;
+            stroke-width: 2;
+            transition: transform 0.3s ease;
+        }
+        #panelToggleButton.collapsed svg {
+            transform: rotate(180deg);
+        }
+
+        /* Mobile-first Control Panel */
+        @media (max-width: 767px) {
+            body {
+                padding-bottom: var(--panel-handle-height); /* Make space for the collapsed handle */
+            }
+            #playerListArea {
+                padding-bottom: 20px; /* Reset padding, body handles spacing now */
+            }
+            #controlPanel {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                width: 100%;
+                border-radius: 20px 20px 0 0;
+                z-index: 100;
+                padding: 10px;
+                box-shadow: 0 -4px 15px rgba(0,0,0,0.2);
+                transition: transform 0.3s ease-in-out;
+            }
+            #controlPanel.collapsed {
+                transform: translateY(calc(100% - var(--panel-handle-height)));
+            }
+            #panelToggleButton {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+        }
+        /* Desktop layout */
+        @media (min-width: 768px) {
+            .game-wrapper {
+                flex-direction: row;
+                align-items: flex-start;
+            }
+            #controlPanel {
+                position: sticky;
+                top: 20px;
+                max-width: 350px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="main-header">
+        <h1>Trò Chơi Tái Sinh - Luân Hồi</h1>
+        <p>(Tạo bởi nhóm Maratika Vietnam)</p>
+    </header>
+
+    <div id="loadingScreen" class="loading-screen">
+        <div class="loading-spinner"></div>
+        <p>Đang tải trò chơi...</p>
+    </div>
+
+    <div id="authOverlay" class="full-screen-overlay" style="display: none;">
+        <div class="overlay-content">
+            <h2 class="text-2xl font-bold">Đang xác thực...</h2>
+            <p id="authStatusMessage">Vui lòng chờ...</p>
+        </div>
+    </div>
+    
+    <div id="entryScreen" class="full-screen-overlay" style="display: none;">
+        <div class="overlay-content">
+            <h2 class="text-2xl font-bold">Tham Gia Chơi</h2>
+            <div>
+                <label for="playerNameInput">Nhập tên của bạn:</label>
+                <input type="text" id="playerNameInput" placeholder="Tên người chơi">
+            </div>
+            <button id="joinGameBtn" class="mt-4">Vào Chơi</button>
+            <p id="entryError" class="text-red-500 mt-3"></p>
+        </div>
+    </div>
+    
+    <div class="game-wrapper" style="display: none;">
+        <div id="playerListArea">
+            <!-- Player cards will be dynamically inserted here -->
+        </div>
+
+        <div id="controlPanel">
+            <button id="panelToggleButton">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                </svg>
+            </button>
+            <div id="playerTurnDisplay"></div>
+            <div class="dice-container">
+                <div id="diceResultDisplay">?</div>
+                <div class="dice-cube" id="diceCube">
+                    <div class="face front">1</div> <div class="face back">6</div>
+                    <div class="face right">4</div> <div class="face left">3</div>
+                    <div class="face top">2</div>   <div class="face bottom">5</div>
+                </div>
+            </div>
+            <div class="main-actions">
+                <button id="rollDiceBtn">Gieo</button>
+                <button id="skipTurnBtn">Bỏ lượt</button>
+            </div>
+            
+            <div class="section-divider">
+                <div class="controls-group">
+                    <input type="number" id="movePositionInput" class="number-input" value="1" min="1" max="104">
+                    <button id="movePlayerBtn" class="action-buttons">Di chuyển</button>
+                </div>
+            </div>
+
+            <div class="section-divider">
+                <div class="merit-display">Công đức hiện có: <span id="meritPointsDisplay">0</span></div>
+                <div class="controls-group">
+                    <div class="radio-group">
+                        <input type="radio" id="meritIncrease" name="meritAction" value="increase" checked>
+                        <label for="meritIncrease">Tăng</label>
+                        <input type="radio" id="meritDecrease" name="meritAction" value="decrease">
+                        <label for="meritDecrease">Giảm</label>
+                    </div>
+                    <input type="number" id="meritPointsInput" class="number-input" value="1" min="1">
+                </div>
+                <div class="action-buttons">
+                    <button id="updateMeritBtn">Công Đức</button>
+                    <button id="specialDiceBtn">Gieo đặc biệt</button>
+                </div>
+            </div>
+            <button id="leaveGameBtn">Thoát</button>
+        </div>
+    </div>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, serverTimestamp, runTransaction, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // --- Constants and Global State ---
+        const SINGLE_ROOM_ID = "maratika_main_rebirth_room";
+        const MAX_PLAYERS = 10;
+        const ROOM_COLLECTION_NAME = "rebirth_game_single_room_v12";
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        
+        let db, auth;
+        let currentUserId = null;
+        let currentRoomUnsubscribe = null; 
+        let localGameState = {}; 
+
+        const animalIconsGlobal = ['🐅', '🐘', '🐎', '🐉', '🦢', '🐒', '🐢', '🦜', '🐬', '🦌']; 
+        
+        const squaresData = [
+            // Dữ liệu 104 ô được giữ nguyên như trước
+            { "number": 1, "name": "Địa ngục Kim Cương", "moves": {} },
+            { "number": 2, "name": "Địa ngục Vô Gián", "moves": { "1": 17, "2": 10, "3": 3 } },
+            { "number": 3, "name": "Địa ngục Nóng", "moves": { "1": 11, "2": 10, "3": 8, "4": 7, "5": 5, "6": 2 } },
+            { "number": 4, "name": "Địa ngục Gào hét", "moves": { "1": 13, "2": 10, "3": 8, "4": 6, "5": 5, "6": 3 } },
+            { "number": 5, "name": "Địa ngục Nghiền nát", "moves": { "1": 13, "2": 11, "3": 10, "4": 7, "5": 4, "6": 3 } },
+            { "number": 6, "name": "Địa ngục Sống lại", "moves": { "1": 17, "2": 12, "3": 10, "4": 8, "5": 5, "6": 4 } },
+            { "number": 7, "name": "Địa ngục Lạnh", "moves": { "1": 15, "2": 18, "3": 11, "4": 10, "5": 6, "6": 5 } },
+            { "number": 8, "name": "Địa ngục Tạm thời", "moves": { "1": 27, "2": 19, "3": 14, "4": 11, "5": 7, "6": 6 } },
+            { "number": 9, "name": "Diêm Vương", "moves": { "1": 42, "2": 34 } },
+            { "number": 10, "name": "Ngạ Quỷ", "moves": { "1": 19, "2": 13, "3": 14, "4": 11, "5": 8, "6": 4 } },
+            { "number": 11, "name": "Thú Vật", "moves": { "1": 27, "2": 17, "3": 12, "4": 13, "5": 10, "6": 5 } },
+            { "number": 12, "name": "Thần Thú", "moves": { "1": 28, "2": 27, "3": 15, "4": 21, "5": 11, "6": 10 } },
+            { "number": 13, "name": "Rồng", "moves": { "1": 28, "2": 27, "3": 15, "4": 21, "5": 11, "6": 10 } },
+            { "number": 14, "name": "Đảo Quỷ", "moves": { "1": 25, "2": 42, "3": 17, "4": 15, "5": 5, "6": 3 } },
+            { "number": 15, "name": "A-tu-la", "moves": { "1": 28, "2": 14, "3": 21, "4": 11, "5": 10, "6": 4 } },
+            { "number": 16, "name": "Quỷ Rudra", "moves": { "2": 34 } },
+            { "number": 17, "name": "Nam Thiện Bộ Châu", "moves": { "1": 52, "2": 25, "3": 26, "4": 38, "5": 22, "6": 6 } },
+            { "number": 18, "name": "Tây Ngưu Hóa Châu", "moves": { "1": 38, "2": 27, "3": 13, "4": 21, "5": 11, "6": 10 } },
+            { "number": 19, "name": "Đông thắng thần châu", "moves": { "1": 43, "2": 38, "3": 13, "4": 15, "5": 13, "6": 11 } },
+            { "number": 20, "name": "Bắc Câu Lô Châu", "moves": { "1": 28, "2": 27, "3": 17, "4": 19, "5": 15 } },
+            { "number": 21, "name": "Bộ tộc Man rợ", "moves": { "1": 15, "2": 62, "3": 13, "4": 11, "5": 10, "6": 2 } },
+            { "number": 22, "name": "Ấn Độ giáo", "moves": { "1": 52, "2": 62, "3": 13, "4": 15, "5": 11, "6": 3 } },
+            { "number": 23, "name": "Bôn giáo", "moves": { "1": 52, "2": 65, "3": 29, "4": 27, "5": 14, "6": 4 } },
+            { "number": 24, "name": "Cô hồn", "moves": { "1": 27, "2": 17, "3": 15, "4": 11, "5": 10, "6": 6 } },
+            { "number": 25, "name": "Bắt đầu Con đường Tantra", "moves": { "1": 72, "2": 33, "6": 38 } },
+            { "number": 26, "name": "Chuyển Luân Thánh Vương", "moves": { "1": 29, "2": 28, "3": 17, "4": 20, "5": 13, "6": 13 } },
+            { "number": 27, "name": "Cõi trời Tứ Đại Thiên Vương", "moves": { "1": 28, "2": 17, "3": 23, "4": 18, "5": 10, "6": 6 } },
+            { "number": 28, "name": "Cõi trời Đạo Lợi", "moves": { "1": 29, "2": 17, "3": 20, "4": 22, "5": 11, "6": 7 } },
+            { "number": 29, "name": "Cõi Trời Dạ Ma", "moves": { "1": 30, "2": 31, "3": 17, "4": 23, "5": 12, "6": 10 } },
+            { "number": 30, "name": "Cõi trời Hỷ Lạc", "moves": { "1": 64, "2": 63, "3": 55, "4": 54, "5": 53, "6": 52 } },
+            { "number": 31, "name": "Cõi Trời Sự Hóa Hiện", "moves": { "1": 52, "2": 30, "3": 43, "4": 32, "5": 22, "6": 12 } },
+            { "number": 32, "name": "Cõi trời Tha Hóa Tự tại", "moves": { "1": 30, "2": 35, "3": 28, "4": 18, "5": 10 } },
+            { "number": 33, "name": "Tantra, Con đường Tích lũy Thấp hơn", "moves": { "1": 41, "2": 42, "5": 16, "6": 1 } },
+            { "number": 34, "name": "Đại Hắc Thiên", "moves": { "1": 61, "2": 81, "3": 70 } },
+            { "number": 35, "name": "Cõi Sắc Giới", "moves": { "1": 37, "2": 52, "3": 36, "4": 30, "5": 17, "6": 27 } },
+            { "number": 36, "name": "Cõi Vô Sắc Giới", "moves": { "1": 38, "2": 17, "3": 11, "6": 4 } },
+            { "number": 37, "name": "Tịnh Cư Thiên", "moves": { "1": 64, "2": 54, "3": 32, "4": 52, "5": 12 } },
+            { "number": 38, "name": "Thanh Văn, Tích Lũy Đạo", "moves": { "1": 37, "2": 40, "3": 39, "4": 52, "5": 11, "6": 5 } },
+            { "number": 39, "name": "Thanh Văn, Gia Hạnh Đạo", "moves": { "1": 52, "2": 43, "3": 40, "4": 52, "5": 28, "6": 19 } },
+            { "number": 40, "name": "Thanh Văn, Kiến Đạo và Tu Đạo", "moves": { "1": 30, "2": 35, "3": 28, "4": 32, "5": 31, "6": 29 } },
+            { "number": 41, "name": "Tantra, Tích lũy Trung cấp", "moves": { "1": 60, "2": 42, "3": 59, "5": 67, "6": 33 } },
+            { "number": 42, "name": "Tantra, Tích lũy Cao hơn", "moves": { "1": 49, "2": 50, "6": 59 } },
+            { "number": 43, "name": "Duyên Giác Thừa, Tích lũy Đạo", "moves": { "1": 52, "2": 44, "3": 28, "4": 38, "5": 13, "6": 6 } },
+            { "number": 44, "name": "Duyên Giác Thừa, Gia Hạnh Đạo", "moves": { "1": 30, "2": 46, "3": 45, "4": 20, "5": 39, "6": 27 } },
+            { "number": 45, "name": "Duyên Giác Thừa, Kiến Đạo", "moves": { "1": 52, "2": 47, "3": 46, "4": 40, "5": 17, "6": 28 } },
+            { "number": 46, "name": "Duyên Giác Thừa, Tu Đạo", "moves": { "1": 30, "2": 47, "3": 37, "4": 35, "5": 51, "6": 29 } },
+            { "number": 47, "name": "Duyên Giác Thừa, A-la-hán", "moves": { "1": 52, "2": 48, "3": 30, "4": 37 } },
+            { "number": 48, "name": "Niết Bàn Vô Dư", "moves": {} },
+            { "number": 49, "name": "Tantra, Gia Hạnh Đạo: Nhiệt", "moves": { "1": 50, "2": 57 } },
+            { "number": 50, "name": "Tantra, Gia Hạnh Đạo: Đỉnh điểm", "moves": { "1": 57, "2": 66 } },
+            { "number": 51, "name": "Thanh Văn, A-la-hán", "moves": { "1": 52, "2": 48, "3": 37 } },
+            { "number": 52, "name": "Đại Thừa, Tiểu Tích lũy Đạo", "moves": { "1": 54, "2": 53, "3": 30, "4": 38, "5": 11, "6": 7 } },
+            { "number": 53, "name": "Đại Thừa, Tích lũy Đạo Trung cấp", "moves": { "1": 55, "2": 54, "3": 37, "4": 40, "5": 15, "6": 8 } },
+            { "number": 54, "name": "Đại Thừa, Tích lũy Đạo Cao hơn", "moves": { "1": 63, "2": 55, "3": 60, "4": 59 } },
+            { "number": 55, "name": "Đại Thừa, Gia Hạnh Đạo: Nhiệt", "moves": { "1": 63, "2": 56 } },
+            { "number": 56, "name": "Đại Thừa, Gia Hạnh Đạo: Đỉnh điểm", "moves": { "1": 64, "2": 63 } },
+            { "number": 57, "name": "Tantra, Gia Hạnh Đạo: Khả tiếp", "moves": { "1": 66, "2": 73, "3": 58, "4": 77 } },
+            { "number": 58, "name": "Tantra, Gia Hạnh Đạo: Giáo lý Cao nhất", "moves": { "1": 73, "2": 74, "3": 66, "4": 85 } },
+            { "number": 59, "name": "Shambhala", "moves": { "1": 63, "2": 50, "3": 60, "4": 49, "5": 42, "6": 55 } },
+            { "number": 60, "name": "Potala", "moves": { "1": 64, "2": 63, "3": 42 } },
+            { "number": 61, "name": "Urgyan", "moves": { "1": 89, "2": 84, "3": 83 } },
+            { "number": 62, "name": "Bậc Trí Giữ Giới Ấn Độ giáo", "moves": { "1": 52, "2": 38 } },
+            { "number": 63, "name": "Đại Thừa, Gia Hạnh Đạo: Khả tiếp", "moves": { "1": 85, "2": 42, "3": 64, "4": 77 } },
+            { "number": 64, "name": "Đại Thừa, Gia Hạnh Đạo: Giáo lý Cao nhất", "moves": { "1": 71, "2": 49, "5": 77 } },
+            { "number": 65, "name": "Bậc Trí Giữ Giới Truyền Thống Bôn", "moves": { "1": 52, "2": 43, "5": 15, "6": 8 } },
+            { "number": 66, "name": "Giai đoạn Tantra thứ nhất", "moves": { "1": 74, "2": 75, "3": 73 } },
+            { "number": 67, "name": "Bậc Trí Giữ Giới trong Cõi Dục giới", "moves": { "1": 41, "2": 42, "3": 68, "4": 69 } },
+            { "number": 68, "name": "Bậc Trí Giữ Giới trong Cõi Sắc", "moves": { "1": 42, "2": 49, "4": 59, "6": 41 } },
+            { "number": 69, "name": "Chuyển Luân Thánh Vương Tantra", "moves": { "1": 75, "2": 81 } },
+            { "number": 70, "name": "Cõi Hoàn Thành Hoạt Động", "moves": { "1": 86, "2": 73, "4": 34, "5": 74, "6": 71 } },
+            { "number": 71, "name": "Giai đoạn Sutra thứ nhất - Hoan Hỷ", "moves": { "1": 79, "2": 80, "3": 74 } },
+            { "number": 72, "name": "Bậc Trí Giữ Giới của Tám Thần Thông", "moves": { "1": 67, "2": 41, "3": 33 } },
+            { "number": 73, "name": "Giai đoạn Tantra thứ hai", "moves": { "1": 75, "2": 81, "6": 69 } },
+            { "number": 74, "name": "Giai đoạn Tantra thứ ba", "moves": { "1": 75, "2": 81 } },
+            { "number": 75, "name": "Giai đoạn Tantra thứ tư", "moves": { "1": 82, "2": 83, "3": 81 } },
+            { "number": 76, "name": "Cõi Đỉnh Ngọc", "moves": { "1": 78, "2": 74, "3": 73 } },
+            { "number": 77, "name": "Cực Lạc", "moves": { "1": 71, "2": 74 } },
+            { "number": 78, "name": "Giai đoạn Sutra thứ tư - Phát quang", "moves": { "1": 87, "2": 88 } },
+            { "number": 79, "name": "Giai đoạn Sutra thứ ba - Phát huy", "moves": { "1": 88, "2": 78 } },
+            { "number": 80, "name": "Giai đoạn Sutra thứ hai - Ly cấu", "moves": { "1": 78, "2": 79 } },
+            { "number": 81, "name": "Giai đoạn Tantra thứ năm", "moves": { "1": 89, "2": 90 } },
+            { "number": 82, "name": "Giai đoạn Tantra thứ sáu", "moves": { "1": 84, "2": 91 } },
+            { "number": 83, "name": "Giai đoạn Tantra thứ bảy", "moves": { "1": 84, "2": 93 } },
+            { "number": 84, "name": "Trời Tối Thượng", "moves": { "1": 93 } },
+            { "number": 85, "name": "Abhirati - Cõi Cực Lạc)", "moves": { "1": 71, "2": 73, "3": 76 } },
+            { "number": 86, "name": "Giai đoạn Sutra thứ bảy - Viễn hành", "moves": { "1": 95, "2": 96 } },
+            { "number": 87, "name": "Abhimukhi - Giai đoạn Sutra thứ sáu - Hiện tiền", "moves": { "1": 96, "2": 86 } },
+            { "number": 88, "name": "Giai đoạn Sutra thứ năm - Cực nan thắng", "moves": { "1": 95, "2": 87 } },
+            { "number": 89, "name": "Giai đoạn Tantra thứ tám", "moves": { "1": 84, "2": 90 } },
+            { "number": 90, "name": "Giai đoạn Tantra thứ chín", "moves": { "1": 84, "2": 91 } },
+            { "number": 91, "name": "Giai đoạn Tantra thứ mười", "moves": { "1": 84, "2": 93 } },
+            { "number": 92, "name": "Đại Báo thân", "moves": { "1": 97 } },
+            { "number": 93, "name": "Pháp thân", "moves": { "1": 92 } },
+            { "number": 94, "name": "Giai đoạn Sutra thứ mười - Pháp Vân", "moves": { "1": 93, "2": 84 } },
+            { "number": 95, "name": "Giai đoạn Sutra thứ chín - Thiện Huệ", "moves": { "1": 94, "2": 84 } },
+            { "number": 96, "name": "Giai đoạn Sutra thứ tám - Bất động", "moves": { "1": 94, "2": 95 } },
+            { "number": 97, "name": "Thành tựu Thân Vật lý", "moves": { "1": 98, "2": 98 } },
+            { "number": 98, "name": "Xuất gia", "moves": { "1": 99, "2": 99 } },
+            { "number": 99, "name": "Khổ hạnh", "moves": { "1": 100, "2": 100 } },
+            { "number": 100, "name": "Chinh phục Ma Vương", "moves": { "1": 101, "2": 101 } },
+            { "number": 101, "name": "Phật quả", "moves": { "1": 102, "2": 102 } },
+            { "number": 102, "name": "Chuyển Pháp Luân", "moves": { "1": 103, "2": 103 } },
+            { "number": 103, "name": "Biểu diễn Phép lạ", "moves": { "1": 104, "2": 104 } },
+            { "number": 104, "name": "Niết bàn", "moves": {} }
+        ];
+        const boardSquaresMap = new Map();
+        squaresData.forEach(sq => boardSquaresMap.set(sq.number, sq));
+
+        // --- DOM Elements ---
+        let loadingScreenEl, authOverlayEl, authStatusMessageEl, entryScreenEl, playerNameInputEl,
+            joinGameBtnEl, entryErrorEl, gameWrapperEl, playerListAreaEl, 
+            controlPanelEl, playerTurnDisplayEl, rollDiceBtnEl, leaveGameBtnEl,
+            diceResultDisplayEl, diceCubeEl, meritPointsDisplayEl, meritPointsInputEl,
+            specialDiceBtnEl, updateMeritBtnEl, panelToggleButtonEl, movePlayerBtnEl, movePositionInputEl, skipTurnBtnEl;
+            
+        // --- Utility Functions ---
+        function showScreen(screenElement) {
+            [loadingScreenEl, authOverlayEl, entryScreenEl, gameWrapperEl].forEach(el => {if(el) el.style.display = 'none'});
+            if (screenElement) {
+                screenElement.style.display = 'flex';
+            }
+        }
+        
+        function displayError(element, message) {
+            if (element) {
+                element.textContent = message;
+                element.style.color = 'red';
+            }
+            console.error(message);
+        }
+
+        function getRealmCategory(squareNumber) {
+            if (squareNumber >= 1 && squareNumber <= 9) return 'hell';
+            if (squareNumber === 10) return 'preta';
+            if (squareNumber >= 11 && squareNumber <= 13) return 'animal';
+            if ((squareNumber >= 17 && squareNumber <= 21) || squareNumber === 24 || squareNumber === 26) return 'human';
+            if (squareNumber === 14 || squareNumber === 15) return 'asura';
+            if ((squareNumber >= 27 && squareNumber <= 32) || (squareNumber >= 35 && squareNumber <= 37) || squareNumber === 84) return 'deva';
+            if ([25, 33, 41, 42, 49, 50, 57, 58, 61, 66, 69, 72, 73, 74, 75, 81, 82, 83, 89, 90, 91].includes(squareNumber)) return 'vajrayana';
+            if ((squareNumber >= 52 && squareNumber <= 56) || (squareNumber >= 63 && squareNumber <= 64) || (squareNumber >= 71 && squareNumber <= 71) || (squareNumber >= 78 && squareNumber <= 80) || (squareNumber >= 86 && squareNumber <= 88) || (squareNumber >= 92 && squareNumber <= 104)) return 'mahayana';
+            if ((squareNumber >= 38 && squareNumber <= 40) || (squareNumber >= 43 && squareNumber <= 47) || squareNumber === 51 || squareNumber === 48) return 'hinayana';
+            if ([16, 22, 23, 62, 65].includes(squareNumber)) return 'nonbuddhist';
+            if ([59, 60, 70, 76, 77, 85].includes(squareNumber)) return 'pureland';
+            return '';
+        }
+
+        // --- Firestore Multiplayer Logic ---
+        async function joinGame() {
+            const playerName = playerNameInputEl.value.trim();
+            if (!playerName) {
+                displayError(entryErrorEl, "Vui lòng nhập tên của bạn.");
+                return;
+            }
+            if (!currentUserId) {
+                displayError(entryErrorEl, "Lỗi xác thực người dùng.");
+                return;
+            }
+
+            joinGameBtnEl.disabled = true;
+            
+            const roomPath = `/artifacts/${appId}/public/data/${ROOM_COLLECTION_NAME}/${SINGLE_ROOM_ID}`;
+            const roomRef = doc(db, roomPath);
+
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const roomDoc = await transaction.get(roomRef);
+                    
+                    if (!roomDoc.exists()) {
+                        const newPlayer = {
+                            uid: currentUserId, name: playerName, icon: animalIconsGlobal[0], 
+                            diceRollHistory: [], meritPoints: 0, position: 24, realmHistory: [{pos: 24, type: 'start'}], isHost: true
+                        };
+                        transaction.set(roomRef, {
+                            roomId: SINGLE_ROOM_ID, players: [newPlayer], currentPlayerIndex: 0,
+                            status: "playing", lastDiceRoll: null, createdAt: serverTimestamp(),
+                            hostUid: currentUserId, lastActivity: serverTimestamp(),
+                        });
+                    } else {
+                        const roomData = roomDoc.data();
+                        if (roomData.players.find(p => p.uid === currentUserId)) {
+                            return; 
+                        }
+                        if (roomData.players.length >= MAX_PLAYERS) {
+                            throw new Error("Phòng đã đầy.");
+                        }
+                        const newPlayer = {
+                            uid: currentUserId, name: playerName, 
+                            icon: animalIconsGlobal[roomData.players.length % animalIconsGlobal.length],
+                            diceRollHistory: [], meritPoints: 0, position: 24, realmHistory: [{pos: 24, type: 'start'}], isHost: false
+                        };
+                        const updatedPlayers = [...roomData.players, newPlayer];
+                        transaction.update(roomRef, { players: updatedPlayers });
+                    }
+                });
+
+                subscribeToRoomUpdates(SINGLE_ROOM_ID);
+                showScreen(gameWrapperEl);
+
+            } catch (error) {
+                displayError(entryErrorEl, "Lỗi vào phòng: " + error.message);
+                joinGameBtnEl.disabled = false;
+            }
+        }
+
+        async function leaveGame() {
+            if (!currentUserId) return;
+            
+            const roomPath = `/artifacts/${appId}/public/data/${ROOM_COLLECTION_NAME}/${SINGLE_ROOM_ID}`;
+            const roomRef = doc(db, roomPath);
+
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const roomDoc = await transaction.get(roomRef);
+                    if (!roomDoc.exists()) return;
+
+                    const roomData = roomDoc.data();
+                    const leavingPlayerIndex = roomData.players.findIndex(p => p.uid === currentUserId);
+                    if (leavingPlayerIndex === -1) return;
+
+                    const updatedPlayers = roomData.players.filter(p => p.uid !== currentUserId);
+
+                    if (updatedPlayers.length === 0) {
+                        transaction.delete(roomRef);
+                    } else {
+                        let newHostUid = roomData.hostUid;
+                        let newCurrentPlayerIndex = roomData.currentPlayerIndex;
+
+                        if (roomData.hostUid === currentUserId) {
+                            updatedPlayers[0].isHost = true;
+                            newHostUid = updatedPlayers[0].uid;
+                        }
+                        
+                        if (leavingPlayerIndex < newCurrentPlayerIndex) {
+                            newCurrentPlayerIndex--;
+                        } else if (leavingPlayerIndex === newCurrentPlayerIndex) {
+                            newCurrentPlayerIndex = leavingPlayerIndex % updatedPlayers.length;
+                        }
+
+                        transaction.update(roomRef, { 
+                            players: updatedPlayers,
+                            hostUid: newHostUid,
+                            currentPlayerIndex: newCurrentPlayerIndex,
+                        });
+                    }
+                });
+                if (currentRoomUnsubscribe) {
+                    currentRoomUnsubscribe();
+                    currentRoomUnsubscribe = null;
+                }
+                showScreen(entryScreenEl);
+                if(joinGameBtnEl) joinGameBtnEl.disabled = false;
+
+            } catch (error) {
+                console.error("Error leaving game:", error);
+            }
+        }
+        
+        function subscribeToRoomUpdates(roomId) {
+            if (currentRoomUnsubscribe) currentRoomUnsubscribe();
+            const roomPath = `/artifacts/${appId}/public/data/${ROOM_COLLECTION_NAME}/${roomId}`;
+            const roomRef = doc(db, roomPath);
+
+            currentRoomUnsubscribe = onSnapshot(roomRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    localGameState = docSnap.data();
+                    if(gameWrapperEl.style.display !== 'none') {
+                        updatePlayerListUI(localGameState);
+                        updateControlPanelUI(localGameState);
+                    }
+                } else {
+                    localGameState = {};
+                    showScreen(entryScreenEl);
+                }
+            }, (error) => {
+                console.error("Error listening to room updates:", error);
+                displayError(entryErrorEl, "Mất kết nối với phòng chơi.");
+            });
+        }
+        
+        function updatePlayerListUI(roomData) {
+            if (!playerListAreaEl || !roomData || !roomData.players) return;
+
+            playerListAreaEl.innerHTML = ''; 
+            
+            roomData.players.forEach((player, index) => {
+                const playerCard = document.createElement('div');
+                playerCard.className = 'player-card';
+                if (index === roomData.currentPlayerIndex && roomData.status === 'playing') {
+                    playerCard.classList.add('current-turn-highlight');
+                }
+
+                const diceHistoryHTML = (player.diceRollHistory || []).map(rollData => 
+                    `<div class="roll-item ${rollData.isGoodRoll ? 'good-roll' : ''} ${rollData.type === 'special' ? 'special-roll' : ''}">${rollData.value}</div>`
+                ).join('');
+                
+                const realmHistoryHTML = (player.realmHistory || []).map(realmData => {
+                    const realmCategory = getRealmCategory(realmData.pos);
+                    const isPureLand = realmCategory === 'pureland';
+                    return `<div class="roll-item ${realmCategory} ${realmData.type === 'manual' ? 'manual-move' : ''}">${realmData.pos}${isPureLand ? '🪷' : ''}</div>`;
+                }).join('');
+
+                const currentPos = player.position || 24;
+                const squareData = boardSquaresMap.get(currentPos);
+                const squareName = squareData ? squareData.name : "Không xác định";
+
+                playerCard.innerHTML = `
+                    <div class="player-card-header">
+                        <div class="player-info">
+                            <span class="player-icon">${player.icon}</span>
+                            <div class="player-name-pos">
+                                <span class="player-name">${player.name}</span>
+                                <span class="player-position-text">Vị trí: ${currentPos}. ${squareName}</span>
+                            </div>
+                        </div>
+                        <div class="player-merit">
+                            ${player.meritPoints || 0} Công đức
+                        </div>
+                    </div>
+                    <div class="history-label">Lịch sử Cảnh giới:</div>
+                    <div class="history-rolls">${realmHistoryHTML}</div>
+                    <div class="history-label">Lịch sử Gieo:</div>
+                    <div class="history-rolls">${diceHistoryHTML}</div>
+                `;
+                playerListAreaEl.appendChild(playerCard);
+            });
+        }
+        
+        function updateControlPanelUI(roomData) {
+            if (!playerTurnDisplayEl || !rollDiceBtnEl || !diceResultDisplayEl || !roomData || !roomData.players) return;
+
+            const currentPlayer = roomData.players[roomData.currentPlayerIndex];
+            const clientPlayer = roomData.players.find(p => p.uid === currentUserId);
+
+            if (currentPlayer) {
+                playerTurnDisplayEl.textContent = `Lượt của: ${currentPlayer.name} ${currentPlayer.icon}`;
+                const isMyTurn = currentPlayer.uid === currentUserId;
+                rollDiceBtnEl.disabled = !isMyTurn;
+                skipTurnBtnEl.disabled = !isMyTurn;
+            } else {
+                 playerTurnDisplayEl.textContent = 'Chờ...';
+                 rollDiceBtnEl.disabled = true;
+                 skipTurnBtnEl.disabled = true;
+            }
+
+            if (clientPlayer) {
+                meritPointsDisplayEl.textContent = clientPlayer.meritPoints || 0;
+            }
+
+            diceResultDisplayEl.textContent = roomData.lastDiceRoll || '?';
+        }
+
+        async function handleRollDiceClick() {
+            if (!localGameState || !localGameState.players || localGameState.status !== "playing") return;
+
+            const currentPlayer = localGameState.players[localGameState.currentPlayerIndex];
+            if (!currentPlayer || currentPlayer.uid !== currentUserId) return;
+            
+            rollDiceBtnEl.disabled = true;
+            skipTurnBtnEl.disabled = true;
+
+            const roll = Math.floor(Math.random() * 6) + 1;
+            
+            if (diceCubeEl && diceResultDisplayEl) {
+                diceResultDisplayEl.style.display = 'none';
+                diceCubeEl.classList.add('is-rolling');
+            }
+
+            setTimeout(async () => {
+                if (diceCubeEl && diceResultDisplayEl) {
+                    diceCubeEl.classList.remove('is-rolling');
+                    diceResultDisplayEl.textContent = roll;
+                    diceResultDisplayEl.style.display = 'flex';
+                }
+
+                let newPlayersArray = JSON.parse(JSON.stringify(localGameState.players)); 
+                let playerToUpdate = newPlayersArray.find(p => p.uid === currentUserId);
+                let isGoodRoll = false;
+                
+                if(playerToUpdate) {
+                    if (!playerToUpdate.diceRollHistory) playerToUpdate.diceRollHistory = [];
+                    if (!playerToUpdate.realmHistory) playerToUpdate.realmHistory = [];
+
+                    const currentRealmCategory = getRealmCategory(playerToUpdate.position || 24);
+                    const goodRealms = ['animal', 'asura', 'human', 'deva'];
+                    if (goodRealms.includes(currentRealmCategory) && (roll === 1 || roll === 2)) {
+                        isGoodRoll = true;
+                        playerToUpdate.meritPoints = (playerToUpdate.meritPoints || 0) + (roll === 1 ? 2 : 1);
+                    }
+                    playerToUpdate.diceRollHistory.push({ value: roll, type: 'normal', isGoodRoll: isGoodRoll });
+
+                    const currentSqData = boardSquaresMap.get(playerToUpdate.position || 24);
+                    if (currentSqData && currentSqData.moves) {
+                        const nextSquareNumber = currentSqData.moves[roll.toString()];
+                        if (nextSquareNumber !== undefined) {
+                            playerToUpdate.position = nextSquareNumber;
+                            playerToUpdate.realmHistory.push({ pos: nextSquareNumber, type: 'normal' });
+                        }
+                    }
+                }
+
+                const nextPlayerIndex = (localGameState.currentPlayerIndex + 1) % newPlayersArray.length;
+                
+                const roomPath = `/artifacts/${appId}/public/data/${ROOM_COLLECTION_NAME}/${SINGLE_ROOM_ID}`;
+                const roomRef = doc(db, roomPath);
+                try {
+                    await updateDoc(roomRef, {
+                        players: newPlayersArray,
+                        currentPlayerIndex: nextPlayerIndex,
+                        lastDiceRoll: roll,
+                        lastActivity: serverTimestamp()
+                    });
+                } catch (error) {
+                    console.error("Error updating game state:", error);
+                    rollDiceBtnEl.disabled = false; 
+                    skipTurnBtnEl.disabled = false;
+                }
+            }, 1500);
+        }
+
+        async function handleSkipTurnClick() {
+            if (!localGameState || !localGameState.players || localGameState.status !== "playing") return;
+
+            const currentPlayer = localGameState.players[localGameState.currentPlayerIndex];
+            if (!currentPlayer || currentPlayer.uid !== currentUserId) return;
+
+            rollDiceBtnEl.disabled = true;
+            skipTurnBtnEl.disabled = true;
+
+            const nextPlayerIndex = (localGameState.currentPlayerIndex + 1) % localGameState.players.length;
+            const roomPath = `/artifacts/${appId}/public/data/${ROOM_COLLECTION_NAME}/${SINGLE_ROOM_ID}`;
+            const roomRef = doc(db, roomPath);
+            try {
+                await updateDoc(roomRef, {
+                    currentPlayerIndex: nextPlayerIndex,
+                    lastDiceRoll: null, // Clear last roll when skipping
+                    lastActivity: serverTimestamp()
+                });
+            } catch (error) {
+                console.error("Error skipping turn:", error);
+                rollDiceBtnEl.disabled = false;
+                skipTurnBtnEl.disabled = false;
+            }
+        }
+
+        async function handleUpdateMeritClick() {
+            if (!localGameState || !localGameState.players) return;
+            
+            const action = document.querySelector('input[name="meritAction"]:checked').value;
+            const points = parseInt(meritPointsInputEl.value);
+            if (isNaN(points) || points <= 0) return;
+
+            updateMeritBtnEl.disabled = true;
+
+            let newPlayersArray = JSON.parse(JSON.stringify(localGameState.players)); 
+            let playerToUpdate = newPlayersArray.find(p => p.uid === currentUserId);
+            
+            if(playerToUpdate) {
+                const currentMerit = playerToUpdate.meritPoints || 0;
+                if (action === 'increase') {
+                    playerToUpdate.meritPoints = currentMerit + points;
+                } else if (action === 'decrease') {
+                    playerToUpdate.meritPoints = Math.max(0, currentMerit - points);
+                }
+            } else {
+                updateMeritBtnEl.disabled = false;
+                return;
+            }
+
+            const roomPath = `/artifacts/${appId}/public/data/${ROOM_COLLECTION_NAME}/${SINGLE_ROOM_ID}`;
+            const roomRef = doc(db, roomPath);
+            try {
+                await updateDoc(roomRef, {
+                    players: newPlayersArray,
+                    lastActivity: serverTimestamp()
+                });
+            } catch (error) {
+                console.error("Error updating merit points:", error);
+            } finally {
+                updateMeritBtnEl.disabled = false;
+            }
+        }
+
+        async function handleSpecialDiceClick() {
+            if (!localGameState || !localGameState.players) return;
+            
+            specialDiceBtnEl.disabled = true;
+            const roll = Math.floor(Math.random() * 6) + 1;
+
+            let newPlayersArray = JSON.parse(JSON.stringify(localGameState.players)); 
+            let playerToUpdate = newPlayersArray.find(p => p.uid === currentUserId);
+            
+            if(playerToUpdate) {
+                if (!playerToUpdate.diceRollHistory) playerToUpdate.diceRollHistory = [];
+                playerToUpdate.diceRollHistory.push({ value: roll, type: 'special', isGoodRoll: false });
+            } else {
+                specialDiceBtnEl.disabled = false;
+                return;
+            }
+
+            const roomPath = `/artifacts/${appId}/public/data/${ROOM_COLLECTION_NAME}/${SINGLE_ROOM_ID}`;
+            const roomRef = doc(db, roomPath);
+            try {
+                await updateDoc(roomRef, {
+                    players: newPlayersArray,
+                    lastActivity: serverTimestamp()
+                });
+            } catch (error) {
+                console.error("Error updating game state for special dice:", error);
+            } finally {
+                specialDiceBtnEl.disabled = false;
+            }
+        }
+
+        async function handleMovePlayerClick() {
+            if (!localGameState || !localGameState.players) return;
+            
+            const newPosition = parseInt(movePositionInputEl.value);
+            if (isNaN(newPosition) || newPosition < 1 || newPosition > 104) {
+                alert("Vui lòng nhập vị trí hợp lệ (1-104).");
+                return;
+            }
+
+            movePlayerBtnEl.disabled = true;
+
+            let newPlayersArray = JSON.parse(JSON.stringify(localGameState.players)); 
+            let playerToUpdate = newPlayersArray.find(p => p.uid === currentUserId);
+
+            if (playerToUpdate) {
+                playerToUpdate.position = newPosition;
+                if (!playerToUpdate.realmHistory) playerToUpdate.realmHistory = [];
+                playerToUpdate.realmHistory.push({ pos: newPosition, type: 'manual' });
+            } else {
+                movePlayerBtnEl.disabled = false;
+                return;
+            }
+
+            const roomPath = `/artifacts/${appId}/public/data/${ROOM_COLLECTION_NAME}/${SINGLE_ROOM_ID}`;
+            const roomRef = doc(db, roomPath);
+            try {
+                await updateDoc(roomRef, {
+                    players: newPlayersArray,
+                    lastActivity: serverTimestamp()
+                });
+            } catch (error) {
+                console.error("Error moving player:", error);
+            } finally {
+                movePlayerBtnEl.disabled = false;
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', async () => {
+            // DOM Element selections
+            loadingScreenEl = document.getElementById('loadingScreen');
+            authOverlayEl = document.getElementById('authOverlay');
+            authStatusMessageEl = document.getElementById('authStatusMessage');
+            entryScreenEl = document.getElementById('entryScreen');
+            playerNameInputEl = document.getElementById('playerNameInput');
+            joinGameBtnEl = document.getElementById('joinGameBtn');
+            entryErrorEl = document.getElementById('entryError');
+            gameWrapperEl = document.querySelector('.game-wrapper');
+            playerListAreaEl = document.getElementById('playerListArea');
+            controlPanelEl = document.getElementById('controlPanel');
+            playerTurnDisplayEl = document.getElementById('playerTurnDisplay');
+            rollDiceBtnEl = document.getElementById('rollDiceBtn');
+            leaveGameBtnEl = document.getElementById('leaveGameBtn');
+            diceResultDisplayEl = document.getElementById('diceResultDisplay');
+            diceCubeEl = document.getElementById('diceCube');
+            meritPointsDisplayEl = document.getElementById('meritPointsDisplay');
+            meritPointsInputEl = document.getElementById('meritPointsInput');
+            specialDiceBtnEl = document.getElementById('specialDiceBtn');
+            updateMeritBtnEl = document.getElementById('updateMeritBtn');
+            panelToggleButtonEl = document.getElementById('panelToggleButton');
+            movePlayerBtnEl = document.getElementById('movePlayerBtn');
+            movePositionInputEl = document.getElementById('movePositionInput');
+            skipTurnBtnEl = document.getElementById('skipTurnBtn');
+
+            if (!firebaseConfig) {
+                loadingScreenEl.innerHTML = "<p>Lỗi cấu hình Firebase. Không thể tải trò chơi.</p>";
+                return;
+            }
+            
+            try {
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+            } catch (e) {
+                loadingScreenEl.innerHTML = "<p>Lỗi khởi tạo Firebase. Không thể tải trò chơi.</p>";
+                return;
+            }
+
+            showScreen(authOverlayEl); 
+
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    currentUserId = user.uid;
+                    authStatusMessageEl.textContent = `Đã xác thực.`; 
+                    setTimeout(() => { 
+                        showScreen(entryScreenEl);
+                        loadingScreenEl.style.display = 'none'; 
+                    }, 500);
+                } else {
+                    authStatusMessageEl.textContent = "Đang đăng nhập ẩn danh...";
+                    try {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch (error) {
+                        authStatusMessageEl.textContent = "Lỗi đăng nhập: " + error.message;
+                    }
+                }
+            });
+            
+            // Event listeners
+            if(joinGameBtnEl) joinGameBtnEl.addEventListener('click', joinGame);
+            if(rollDiceBtnEl) rollDiceBtnEl.addEventListener('click', handleRollDiceClick);
+            if(skipTurnBtnEl) skipTurnBtnEl.addEventListener('click', handleSkipTurnClick);
+            if(specialDiceBtnEl) specialDiceBtnEl.addEventListener('click', handleSpecialDiceClick);
+            if(updateMeritBtnEl) updateMeritBtnEl.addEventListener('click', handleUpdateMeritClick);
+            if(leaveGameBtnEl) leaveGameBtnEl.addEventListener('click', leaveGame);
+            if(movePlayerBtnEl) movePlayerBtnEl.addEventListener('click', handleMovePlayerClick);
+            if(panelToggleButtonEl) panelToggleButtonEl.addEventListener('click', () => {
+                controlPanelEl.classList.toggle('collapsed');
+                panelToggleButtonEl.classList.toggle('collapsed');
+            });
+        });
+
+    </script>
+</body>
+</html>
