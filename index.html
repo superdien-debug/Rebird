@@ -645,12 +645,12 @@ const app = initializeApp(firebaseConfig);
             }
             
             switch (roll) {
-                case 1: return `Cực thiện nghiệp trổ quả! Một nhân duyên hy hữu đã đưa bạn từ ${oldSquare.name} thẳng đến cảnh giới an lành ${newSquare.name}.`;
+                case 1: return `Bởi 10 thiện nghiệp bạn đã tích từ nhiều kiếp, Cuối đời Cực thiện nghiệp trổ quả! Một nhân duyên hy hữu đã đưa bạn từ ${oldSquare.name} thẳng đến cảnh giới an lành ${newSquare.name}.`;
                 case 2: return `Thiện nghiệp to lớn từ quá khứ đã chín muồi, giúp bạn thoát khỏi ${oldSquare.name} và tái sinh về ${newSquare.name}.`;
                 case 3: return `Nghiệp thiện ác cân bằng, duyên nghiệp đã đưa bạn từ ${oldSquare.name} đến với một kiếp sống mới tại ${newSquare.name}.`;
-                case 4: return `Một vài chướng ngại nhỏ từ ác nghiệp trong kiếp sống ở ${oldSquare.name} đã dẫn dắt bạn đến với ${newSquare.name}.`;
-                case 5: return `Ác nghiệp nặng nề từ ${oldSquare.name} đã hiển hiện, kéo bạn đến với cảnh giới ${newSquare.name}.`;
-                case 6: return `Cực ác nghiệp đã chín muồi! Nghiệp lực sâu dày từ ${oldSquare.name} đã đẩy bạn đọa vào ${newSquare.name}.`;
+                case 4: return `Các ác nghiệp trong kiếp sống ở ${oldSquare.name} đã dẫn dắt bạn đến với ${newSquare.name}.`;
+                case 5: return `Ác nghiệp nặng nề từ ${oldSquare.name} đã hiển hiện, Lúc vào lâm trung Cận tử Nghiệp kéo bạn đến với cảnh giới ${newSquare.name}.`;
+                case 6: return `1 trong 10 Cực ác nghiệp gieo nhiều kiếp đã chín muồi! Nghiệp lực sâu dày từ ${oldSquare.name} Lúc vào lâm trung Cận tử Nghiệp đã đẩy bạn đọa vào ${newSquare.name}.`;
             }
             return `Từ ${oldSquare.name}, nghiệp duyên đã dẫn dắt bạn đến với kiếp sống mới tại ${newSquare.name}.`;
         }
@@ -697,12 +697,12 @@ const app = initializeApp(firebaseConfig);
                                 hostUid: currentUserId, lastActivity: serverTimestamp(),
                             });
                         } else {
-                            throw new Error("Trò chơi chưa được khởi tạo bởi Admin.");
+                            throw new Error("Trò chơi chưa được khởi tạo bởi Mara (Vua cõi trời Tha Hóa Tự Tại).");
                         }
                     } else {
                         const roomData = roomDoc.data();
                         if (roomData.status === 'waiting' && !isCurrentUserAdmin) {
-                            throw new Error("Trò chơi chưa bắt đầu. Vui lòng chờ Admin.");
+                            throw new Error("Trò chơi chưa bắt đầu. Vui lòng chờ Mara (Vua cõi trời Tha Hóa Tự Tại).");
                         }
                         if (roomData.players.find(p => p.uid === currentUserId)) {
                             return; 
@@ -790,7 +790,7 @@ const app = initializeApp(firebaseConfig);
                 } else {
                     localGameState = {};
                     if (!isCurrentUserAdmin) {
-                        alert("Trò chơi đã kết thúc bởi Admin.");
+                        alert("Trò chơi đã kết thúc bởi MARA.");
                     }
                     showScreen(entryScreenEl);
                 }
@@ -837,7 +837,7 @@ const app = initializeApp(firebaseConfig);
                             <span class="player-icon">${player.icon}</span>
                             <div class="player-name-pos">
                                 <span class="player-position-text">${currentPos}. ${squareName}</span>
-                                <span class="player-name">${player.name} ${player.isAdmin ? ' (Admin)' : ''}</span>
+                                <span class="player-name">${player.name} ${player.isAdmin ? ' (MARA)' : ''}</span>
                             </div>
                         </div>
                         <div class="player-merit">
