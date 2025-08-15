@@ -122,8 +122,8 @@
         .player-info { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         .player-icon { font-size: 1.5rem; }
         .player-name-pos { display: flex; flex-direction: column; align-items: flex-start; }
-        .player-name { font-size: 1.1rem; font-weight: 600; color: #5d4037; }
-        .player-position-text { font-size: 0.8rem; color: #8c6b4f; }
+        .player-name { font-size: 0.9rem; color: #8c6b4f; }
+        .player-position-text { font-size: 1.1rem; font-weight: bold; color: #5d4037; text-transform: uppercase; }
         .player-merit { font-size: 0.9rem; font-weight: bold; color: #2e7d32; }
         
         .history-label { font-size: 0.8rem; font-weight: 600; color: #8c6b4f; text-transform: uppercase; margin: 10px 0 5px 0; }
@@ -156,6 +156,7 @@
         .realm-mahayana { background-color: #f48fb1; color: #880e4f; }
         .realm-hinayana { background-color: #80deea; color: #006064; }
         .realm-nonbuddhist { background-color: #212121; color: white; }
+        .realm-pureland { background-color: #b3e5fc; color: #01579b; }
 
         #controlPanel {
             width: 100%;
@@ -275,6 +276,25 @@
         }
         #panelToggleButton.collapsed svg {
             transform: rotate(180deg);
+        }
+        
+        #notificationModal {
+            display: none;
+        }
+        #notificationModal .overlay-content {
+            max-width: 500px;
+        }
+        #notificationIcon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        #notificationTitle {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        #notificationMessage {
+            font-size: 1rem;
         }
 
         /* Mobile-first Control Panel */
@@ -406,6 +426,16 @@
             <button id="leaveGameBtn">Thoát</button>
         </div>
     </div>
+
+    <!-- Notification Modal -->
+    <div id="notificationModal" class="full-screen-overlay">
+        <div class="overlay-content">
+            <div id="notificationIcon"></div>
+            <h2 id="notificationTitle" class="text-2xl font-bold"></h2>
+            <p id="notificationMessage"></p>
+            <button id="closeNotificationBtn" class="mt-4">Đã hiểu</button>
+        </div>
+    </div>
     
     <script type="module">
         // SỬA LỖI: Chỉ import các hàm cần thiết từ đúng URL CDN
@@ -428,7 +458,6 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-//const analytics = getAnalytics(app);
         // ---------------------------------------------------------
 
         // --- Constants and Global State ---
@@ -562,7 +591,8 @@ const app = initializeApp(firebaseConfig);
             controlPanelEl, playerTurnDisplayEl, rollDiceBtnEl, leaveGameBtnEl,
             diceResultDisplayEl, diceCubeEl, meritPointsDisplayEl, meritPointsInputEl,
             specialDiceBtnEl, updateMeritBtnEl, panelToggleButtonEl, movePlayerBtnEl, movePositionInputEl, skipTurnBtnEl,
-            adminPanelEl, adminGameControlBtnEl;
+            adminPanelEl, adminGameControlBtnEl,
+            notificationModalEl, notificationIconEl, notificationTitleEl, notificationMessageEl, closeNotificationBtnEl;
             
         // --- Utility Functions ---
         function showScreen(screenElement) {
@@ -593,6 +623,13 @@ const app = initializeApp(firebaseConfig);
             if ([16, 22, 23, 62, 65].includes(squareNumber)) return 'nonbuddhist';
             if ([59, 60, 70, 76, 77, 85].includes(squareNumber)) return 'pureland';
             return '';
+        }
+
+        function showNotification(icon, title, message) {
+            notificationIconEl.textContent = icon;
+            notificationTitleEl.textContent = title;
+            notificationMessageEl.textContent = message;
+            notificationModalEl.style.display = 'flex';
         }
 
         // --- Firestore Multiplayer Logic ---
@@ -751,7 +788,7 @@ const app = initializeApp(firebaseConfig);
                 const realmHistoryHTML = (player.realmHistory || []).map(realmData => {
                     const realmCategory = getRealmCategory(realmData.pos);
                     const isPureLand = realmCategory === 'pureland';
-                    return `<div class="roll-item ${realmCategory} ${realmData.type === 'manual' ? 'manual-move' : ''}">${realmData.pos}${isPureLand ? '🪷' : ''}</div>`;
+                    return `<div class="roll-item realm-${realmCategory} ${realmData.type === 'manual' ? 'manual-move' : ''}">${realmData.pos}${isPureLand ? '🪷' : ''}</div>`;
                 }).join('');
 
                 const currentPos = player.position || 24;
@@ -766,8 +803,8 @@ const app = initializeApp(firebaseConfig);
                         <div class="player-info">
                             <span class="player-icon">${player.icon}</span>
                             <div class="player-name-pos">
+                                <span class="player-position-text">${currentPos}. ${squareName}</span>
                                 <span class="player-name">${player.name} ${player.isAdmin ? ' (Admin)' : ''}</span>
-                                <span class="player-position-text">Vị trí: ${currentPos}. ${squareName}</span>
                             </div>
                         </div>
                         <div class="player-merit">
@@ -852,26 +889,58 @@ const app = initializeApp(firebaseConfig);
                 let newPlayersArray = JSON.parse(JSON.stringify(localGameState.players)); 
                 let playerToUpdate = newPlayersArray.find(p => p.uid === currentUserId);
                 let isGoodRoll = false;
+                let notification = { icon: '🎲', title: 'Kết quả Gieo', message: '' };
                 
                 if(playerToUpdate) {
                     if (!playerToUpdate.diceRollHistory) playerToUpdate.diceRollHistory = [];
                     if (!playerToUpdate.realmHistory) playerToUpdate.realmHistory = [];
+                    
+                    const oldPosition = playerToUpdate.position || 24;
+                    const oldRealmCategory = getRealmCategory(oldPosition);
 
-                    const currentRealmCategory = getRealmCategory(playerToUpdate.position || 24);
+                    // Merit point rules for staying in a realm
+                    if (['mahayana', 'vajrayana'].includes(oldRealmCategory)) {
+                        playerToUpdate.meritPoints = (playerToUpdate.meritPoints || 0) + 1;
+                    } else if ([26, 62, 65, 67, 68, 69, 72].includes(oldPosition)) { // Trì minh vương & Chuyển luân vương
+                        playerToUpdate.meritPoints = (playerToUpdate.meritPoints || 0) + 1;
+                    }
+
+                    const currentRealmCategory = getRealmCategory(oldPosition);
                     const goodRealms = ['animal', 'asura', 'human', 'deva'];
                     if (goodRealms.includes(currentRealmCategory) && (roll === 1 || roll === 2)) {
                         isGoodRoll = true;
-                        playerToUpdate.meritPoints = (playerToUpdate.meritPoints || 0) + (roll === 1 ? 2 : 1);
+                        const meritGained = (roll === 1 ? 2 : 1);
+                        playerToUpdate.meritPoints = (playerToUpdate.meritPoints || 0) + meritGained;
+                        notification = { icon: '🙏', title: 'Tán thán Công đức!', message: `Nhờ phước báu, bạn nhận được ${meritGained} công đức.` };
                     }
                     playerToUpdate.diceRollHistory.push({ value: roll, type: 'normal', isGoodRoll: isGoodRoll });
 
-                    const currentSqData = boardSquaresMap.get(playerToUpdate.position || 24);
+                    const currentSqData = boardSquaresMap.get(oldPosition);
+                    let nextSquareNumber = oldPosition;
                     if (currentSqData && currentSqData.moves) {
-                        const nextSquareNumber = currentSqData.moves[roll.toString()];
-                        if (nextSquareNumber !== undefined) {
-                            playerToUpdate.position = nextSquareNumber;
-                            playerToUpdate.realmHistory.push({ pos: nextSquareNumber, type: 'normal' });
+                        const movedTo = currentSqData.moves[roll.toString()];
+                        if (movedTo !== undefined) {
+                            nextSquareNumber = movedTo;
                         }
+                    }
+
+                    if (nextSquareNumber !== oldPosition) {
+                        playerToUpdate.position = nextSquareNumber;
+                        playerToUpdate.realmHistory.push({ pos: nextSquareNumber, type: 'normal' });
+                        const newRealmCategory = getRealmCategory(nextSquareNumber);
+                        
+                        // Merit point rules for arriving at a new realm
+                        if ([26, 62, 65, 67, 68, 69, 72].includes(nextSquareNumber)) { // Trì minh vương & Chuyển luân vương
+                            const arrivalMerit = (nextSquareNumber === 26) ? 10 : 5;
+                            playerToUpdate.meritPoints = (playerToUpdate.meritPoints || 0) + arrivalMerit;
+                            notification = { icon: '👑', title: 'Thành tựu!', message: `Bạn đã trở thành Chuyển Luân/Trì Minh Vương và nhận ${arrivalMerit} công đức.` };
+                        } else if (newRealmCategory === 'hell' || newRealmCategory === 'preta') {
+                            notification = { icon: '😢', title: 'Quả báo đã trổ!', message: `Nghiệp bất thiện đã đưa bạn đến cảnh giới khổ đau.` };
+                        } else if (newRealmCategory === 'deva' || newRealmCategory === 'pureland') {
+                            notification = { icon: '🎉', title: 'Chúc mừng!', message: `Phước báu đã đưa bạn đến một cảnh giới an lành.` };
+                        }
+                    } else {
+                         notification.message = `Bạn gieo được ${roll} và vẫn ở lại cảnh giới hiện tại.`;
                     }
                 }
 
@@ -886,6 +955,7 @@ const app = initializeApp(firebaseConfig);
                         lastDiceRoll: roll,
                         lastActivity: serverTimestamp()
                     });
+                    showNotification(notification.icon, notification.title, notification.message);
                 } catch (error) {
                     console.error("Error updating game state:", error);
                     rollDiceBtnEl.disabled = false; 
@@ -1088,6 +1158,11 @@ const app = initializeApp(firebaseConfig);
             skipTurnBtnEl = document.getElementById('skipTurnBtn');
             adminPanelEl = document.getElementById('adminPanel');
             adminGameControlBtnEl = document.getElementById('adminGameControlBtn');
+            notificationModalEl = document.getElementById('notificationModal');
+            notificationIconEl = document.getElementById('notificationIcon');
+            notificationTitleEl = document.getElementById('notificationTitle');
+            notificationMessageEl = document.getElementById('notificationMessage');
+            closeNotificationBtnEl = document.getElementById('closeNotificationBtn');
 
             if (!firebaseConfig || !firebaseConfig.apiKey || firebaseConfig.apiKey === "YOUR_API_KEY") {
                 document.body.innerHTML = '<div style="padding: 20px; text-align: center; font-size: 1.2rem;"><h1>Lỗi Cấu hình</h1><p>Bạn chưa cung cấp cấu hình Firebase. Vui lòng chỉnh sửa mã nguồn, dán cấu hình của bạn vào biến `firebaseConfig` và thử lại.</p></div>';
@@ -1132,6 +1207,9 @@ const app = initializeApp(firebaseConfig);
             if(panelToggleButtonEl) panelToggleButtonEl.addEventListener('click', () => {
                 controlPanelEl.classList.toggle('collapsed');
                 panelToggleButtonEl.classList.toggle('collapsed');
+            });
+            if(closeNotificationBtnEl) closeNotificationBtnEl.addEventListener('click', () => {
+                notificationModalEl.style.display = 'none';
             });
         });
 
