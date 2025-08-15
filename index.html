@@ -29,7 +29,7 @@
             width: 100%;
         }
         .main-header h1 {
-            font-size: 1.5rem;
+            font-size: 2rem;
             font-weight: 700;
             color: #5d4037;
         }
@@ -409,35 +409,29 @@
     
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, serverTimestamp, runTransaction, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
+        // --- BƯỚC 1: DÁN CẤU HÌNH FIREBASE CỦA BẠN VÀO ĐÂY ---
+        // Lấy cấu hình này từ Firebase Console của dự án của bạn
+        // (Project Settings -> General -> Your apps -> Web app -> Firebase SDK snippet -> Config)
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+        // ---------------------------------------------------------
+
         // --- Constants and Global State ---
         const SINGLE_ROOM_ID = "maratika_main_rebirth_room";
         const MAX_PLAYERS = 10;
+        // BƯỚC 2: Đổi tên collection nếu bạn muốn có một phòng chơi mới hoàn toàn
         const ROOM_COLLECTION_NAME = "game_room";
         const ADMIN_NAME = "Tsering Gesar";
-       // Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyAO08-aOuCFzmj8WwbX6MDkDipWtRJ6z_Q",
-  authDomain: "maratika-rebird-game.firebaseapp.com",
-  projectId: "maratika-rebird-game",
-  storageBucket: "maratika-rebird-game.firebasestorage.app",
-  messagingSenderId: "876143692916",
-  appId: "1:876143692916:web:166d98a1243facf0019521",
-  measurementId: "G-V70SSVYEXD"
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);        
+        
         let db, auth;
         let currentUserId = null;
         let isCurrentUserAdmin = false;
@@ -1089,8 +1083,8 @@ const analytics = getAnalytics(app);
             adminPanelEl = document.getElementById('adminPanel');
             adminGameControlBtnEl = document.getElementById('adminGameControlBtn');
 
-            if (!firebaseConfig) {
-                loadingScreenEl.innerHTML = "<p>Lỗi cấu hình Firebase. Không thể tải trò chơi.</p>";
+            if (!firebaseConfig || !firebaseConfig.apiKey || firebaseConfig.apiKey === "YOUR_API_KEY") {
+                document.body.innerHTML = '<div style="padding: 20px; text-align: center; font-size: 1.2rem;"><h1>Lỗi Cấu hình</h1><p>Bạn chưa cung cấp cấu hình Firebase. Vui lòng chỉnh sửa mã nguồn, dán cấu hình của bạn vào biến `firebaseConfig` và thử lại.</p></div>';
                 return;
             }
             
@@ -1099,26 +1093,26 @@ const analytics = getAnalytics(app);
                 auth = getAuth(app);
                 db = getFirestore(app);
             } catch (e) {
-                loadingScreenEl.innerHTML = "<p>Lỗi khởi tạo Firebase. Không thể tải trò chơi.</p>";
+                loadingScreenEl.innerHTML = "<p>Lỗi khởi tạo Firebase. Hãy kiểm tra lại cấu hình của bạn.</p>";
                 return;
             }
 
             showScreen(authOverlayEl); 
 
-onAuthStateChanged(auth, async (user) => {
-    if (user) {
-        currentUserId = user.uid;
-        showScreen(entryScreenEl);
-        loadingScreenEl.style.display = 'none';
-    } else {
-        try {
-            await signInAnonymously(auth);
-        } catch (error) {
-           showScreen(loadingScreenEl);
-           loadingScreenEl.innerHTML = "<p>Lỗi xác thực. Vui lòng tải lại trang.</p>";
-        }
-    }
-});
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    currentUserId = user.uid;
+                    showScreen(entryScreenEl);
+                    loadingScreenEl.style.display = 'none';
+                } else {
+                    try {
+                        await signInAnonymously(auth);
+                    } catch (error) {
+                       showScreen(loadingScreenEl);
+                       loadingScreenEl.innerHTML = "<p>Lỗi xác thực. Vui lòng tải lại trang.</p>";
+                    }
+                }
+            });
             
             // Event listeners
             if(joinGameBtnEl) joinGameBtnEl.addEventListener('click', joinGame);
