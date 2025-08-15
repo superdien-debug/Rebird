@@ -29,7 +29,7 @@
             width: 100%;
         }
         .main-header h1 {
-            font-size: 2rem;
+            font-size: 1.5rem;
             font-weight: 700;
             color: #5d4037;
         }
@@ -242,6 +242,16 @@
         #specialDiceBtn { background-color: #4a90e2; box-shadow: 0 3px #357ABD; }
         #movePlayerBtn { background-color: #f57c00; box-shadow: 0 3px #e65100; }
         #leaveGameBtn { background-color: #d32f2f; box-shadow: 0 3px #b71c1c; margin-top: 15px; }
+        .kick-btn {
+            background-color: #d32f2f; color: white; border: none;
+            border-radius: 4px; padding: 2px 6px; font-size: 0.7rem;
+            cursor: pointer; margin-left: 5px;
+        }
+        #adminPanel button {
+             background-color: #6d4c41; color: white; padding: 10px 15px;
+             border: none; border-radius: 8px; font-size: 1rem;
+             width: 100%;
+        }
 
         #panelToggleButton {
             display: none; /* Hidden by default, shown only on mobile */
@@ -312,7 +322,7 @@
 <body>
     <header class="main-header">
         <h1>Trò Chơi Tái Sinh - Luân Hồi</h1>
-        <p>(Tạo bởi nhóm Maratika Vietnam)</p>
+        <p>(Tạo bởi Maratika Vietnam)</p>
     </header>
 
     <div id="loadingScreen" class="loading-screen">
@@ -320,10 +330,10 @@
         <p>Đang tải trò chơi...</p>
     </div>
 
-    <div id="authOverlay" class="full-screen-overlay" style="display: none;">
+    <div id="authOverlay" class="full-screen-overlay">
         <div class="overlay-content">
             <h2 class="text-2xl font-bold">Đang xác thực...</h2>
-            <p id="authStatusMessage">Vui lòng chờ...</p>
+            <p>Vui lòng chờ...</p>
         </div>
     </div>
     
@@ -387,24 +397,32 @@
                     <button id="specialDiceBtn">Gieo đặc biệt</button>
                 </div>
             </div>
+            
+            <div id="adminPanel" class="section-divider hidden">
+                <h3 class="font-bold mb-2">Bảng Admin</h3>
+                <button id="adminGameControlBtn">Bắt đầu Trò chơi</button>
+            </div>
+
             <button id="leaveGameBtn">Thoát</button>
         </div>
     </div>
     
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, onAuthStateChanged, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, serverTimestamp, runTransaction, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         // --- Constants and Global State ---
         const SINGLE_ROOM_ID = "maratika_main_rebirth_room";
         const MAX_PLAYERS = 10;
-        const ROOM_COLLECTION_NAME = "rebirth_game_single_room_v12";
+        const ROOM_COLLECTION_NAME = "rebirth_game_single_room_v14";
+        const ADMIN_NAME = "Tsering Gesar";
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
         
         let db, auth;
         let currentUserId = null;
+        let isCurrentUserAdmin = false;
         let currentRoomUnsubscribe = null; 
         let localGameState = {}; 
 
@@ -416,13 +434,13 @@
             { "number": 2, "name": "Địa ngục Vô Gián", "moves": { "1": 17, "2": 10, "3": 3 } },
             { "number": 3, "name": "Địa ngục Nóng", "moves": { "1": 11, "2": 10, "3": 8, "4": 7, "5": 5, "6": 2 } },
             { "number": 4, "name": "Địa ngục Gào hét", "moves": { "1": 13, "2": 10, "3": 8, "4": 6, "5": 5, "6": 3 } },
-            { "number": 5, "name": "Địa ngục Nghiền nát", "moves": { "1": 13, "2": 11, "3": 10, "4": 7, "5": 4, "6": 3 } },
-            { "number": 6, "name": "Địa ngục Sống lại", "moves": { "1": 17, "2": 12, "3": 10, "4": 8, "5": 5, "6": 4 } },
+            { "number": 5, "name": "Địa ngục Nghiền Ép", "moves": { "1": 13, "2": 11, "3": 10, "4": 7, "5": 4, "6": 3 } },
+            { "number": 6, "name": "Địa ngục Phục sinh", "moves": { "1": 17, "2": 12, "3": 10, "4": 8, "5": 5, "6": 4 } },
             { "number": 7, "name": "Địa ngục Lạnh", "moves": { "1": 15, "2": 18, "3": 11, "4": 10, "5": 6, "6": 5 } },
             { "number": 8, "name": "Địa ngục Tạm thời", "moves": { "1": 27, "2": 19, "3": 14, "4": 11, "5": 7, "6": 6 } },
             { "number": 9, "name": "Diêm Vương", "moves": { "1": 42, "2": 34 } },
             { "number": 10, "name": "Ngạ Quỷ", "moves": { "1": 19, "2": 13, "3": 14, "4": 11, "5": 8, "6": 4 } },
-            { "number": 11, "name": "Thú Vật", "moves": { "1": 27, "2": 17, "3": 12, "4": 13, "5": 10, "6": 5 } },
+            { "number": 11, "name": "Súc Sinh", "moves": { "1": 27, "2": 17, "3": 12, "4": 13, "5": 10, "6": 5 } },
             { "number": 12, "name": "Thần Thú", "moves": { "1": 28, "2": 27, "3": 15, "4": 21, "5": 11, "6": 10 } },
             { "number": 13, "name": "Rồng", "moves": { "1": 28, "2": 27, "3": 15, "4": 21, "5": 11, "6": 10 } },
             { "number": 14, "name": "Đảo Quỷ", "moves": { "1": 25, "2": 42, "3": 17, "4": 15, "5": 5, "6": 3 } },
@@ -430,21 +448,21 @@
             { "number": 16, "name": "Quỷ Rudra", "moves": { "2": 34 } },
             { "number": 17, "name": "Nam Thiện Bộ Châu", "moves": { "1": 52, "2": 25, "3": 26, "4": 38, "5": 22, "6": 6 } },
             { "number": 18, "name": "Tây Ngưu Hóa Châu", "moves": { "1": 38, "2": 27, "3": 13, "4": 21, "5": 11, "6": 10 } },
-            { "number": 19, "name": "Đông thắng thần châu", "moves": { "1": 43, "2": 38, "3": 13, "4": 15, "5": 13, "6": 11 } },
+            { "number": 19, "name": "Đông Thắng Thần châu", "moves": { "1": 43, "2": 38, "3": 13, "4": 15, "5": 13, "6": 11 } },
             { "number": 20, "name": "Bắc Câu Lô Châu", "moves": { "1": 28, "2": 27, "3": 17, "4": 19, "5": 15 } },
             { "number": 21, "name": "Bộ tộc Man rợ", "moves": { "1": 15, "2": 62, "3": 13, "4": 11, "5": 10, "6": 2 } },
             { "number": 22, "name": "Ấn Độ giáo", "moves": { "1": 52, "2": 62, "3": 13, "4": 15, "5": 11, "6": 3 } },
             { "number": 23, "name": "Bôn giáo", "moves": { "1": 52, "2": 65, "3": 29, "4": 27, "5": 14, "6": 4 } },
-            { "number": 24, "name": "Cô hồn", "moves": { "1": 27, "2": 17, "3": 15, "4": 11, "5": 10, "6": 6 } },
+            { "number": 24, "name": "Cảnh giới Thân trung Ấm", "moves": { "1": 27, "2": 17, "3": 15, "4": 11, "5": 10, "6": 6 } },
             { "number": 25, "name": "Bắt đầu Con đường Tantra", "moves": { "1": 72, "2": 33, "6": 38 } },
             { "number": 26, "name": "Chuyển Luân Thánh Vương", "moves": { "1": 29, "2": 28, "3": 17, "4": 20, "5": 13, "6": 13 } },
-            { "number": 27, "name": "Cõi trời Tứ Đại Thiên Vương", "moves": { "1": 28, "2": 17, "3": 23, "4": 18, "5": 10, "6": 6 } },
-            { "number": 28, "name": "Cõi trời Đạo Lợi", "moves": { "1": 29, "2": 17, "3": 20, "4": 22, "5": 11, "6": 7 } },
+            { "number": 27, "name": "Cõi Trời Tứ Đại Thiên Vương", "moves": { "1": 28, "2": 17, "3": 23, "4": 18, "5": 10, "6": 6 } },
+            { "number": 28, "name": "Cõi Trời Đạo Lợi", "moves": { "1": 29, "2": 17, "3": 20, "4": 22, "5": 11, "6": 7 } },
             { "number": 29, "name": "Cõi Trời Dạ Ma", "moves": { "1": 30, "2": 31, "3": 17, "4": 23, "5": 12, "6": 10 } },
-            { "number": 30, "name": "Cõi trời Hỷ Lạc", "moves": { "1": 64, "2": 63, "3": 55, "4": 54, "5": 53, "6": 52 } },
-            { "number": 31, "name": "Cõi Trời Sự Hóa Hiện", "moves": { "1": 52, "2": 30, "3": 43, "4": 32, "5": 22, "6": 12 } },
-            { "number": 32, "name": "Cõi trời Tha Hóa Tự tại", "moves": { "1": 30, "2": 35, "3": 28, "4": 18, "5": 10 } },
-            { "number": 33, "name": "Tantra, Con đường Tích lũy Thấp hơn", "moves": { "1": 41, "2": 42, "5": 16, "6": 1 } },
+            { "number": 30, "name": "Cõi Trời Hỷ Lạc", "moves": { "1": 64, "2": 63, "3": 55, "4": 54, "5": 53, "6": 52 } },
+            { "number": 31, "name": "Cõi Trời Hóa Hiện", "moves": { "1": 52, "2": 30, "3": 43, "4": 32, "5": 22, "6": 12 } },
+            { "number": 32, "name": "Cõi Trời Tha Hóa Tự tại", "moves": { "1": 30, "2": 35, "3": 28, "4": 18, "5": 10 } },
+            { "number": 33, "name": "Tantra, Tiểu Tích lũy", "moves": { "1": 41, "2": 42, "5": 16, "6": 1 } },
             { "number": 34, "name": "Đại Hắc Thiên", "moves": { "1": 61, "2": 81, "3": 70 } },
             { "number": 35, "name": "Cõi Sắc Giới", "moves": { "1": 37, "2": 52, "3": 36, "4": 30, "5": 17, "6": 27 } },
             { "number": 36, "name": "Cõi Vô Sắc Giới", "moves": { "1": 38, "2": 17, "3": 11, "6": 4 } },
@@ -452,62 +470,62 @@
             { "number": 38, "name": "Thanh Văn, Tích Lũy Đạo", "moves": { "1": 37, "2": 40, "3": 39, "4": 52, "5": 11, "6": 5 } },
             { "number": 39, "name": "Thanh Văn, Gia Hạnh Đạo", "moves": { "1": 52, "2": 43, "3": 40, "4": 52, "5": 28, "6": 19 } },
             { "number": 40, "name": "Thanh Văn, Kiến Đạo và Tu Đạo", "moves": { "1": 30, "2": 35, "3": 28, "4": 32, "5": 31, "6": 29 } },
-            { "number": 41, "name": "Tantra, Tích lũy Trung cấp", "moves": { "1": 60, "2": 42, "3": 59, "5": 67, "6": 33 } },
-            { "number": 42, "name": "Tantra, Tích lũy Cao hơn", "moves": { "1": 49, "2": 50, "6": 59 } },
-            { "number": 43, "name": "Duyên Giác Thừa, Tích lũy Đạo", "moves": { "1": 52, "2": 44, "3": 28, "4": 38, "5": 13, "6": 6 } },
-            { "number": 44, "name": "Duyên Giác Thừa, Gia Hạnh Đạo", "moves": { "1": 30, "2": 46, "3": 45, "4": 20, "5": 39, "6": 27 } },
-            { "number": 45, "name": "Duyên Giác Thừa, Kiến Đạo", "moves": { "1": 52, "2": 47, "3": 46, "4": 40, "5": 17, "6": 28 } },
-            { "number": 46, "name": "Duyên Giác Thừa, Tu Đạo", "moves": { "1": 30, "2": 47, "3": 37, "4": 35, "5": 51, "6": 29 } },
+            { "number": 41, "name": "Tantra, Trung Tích lũy ", "moves": { "1": 60, "2": 42, "3": 59, "5": 67, "6": 33 } },
+            { "number": 42, "name": "Tantra, Đại Tích lũy", "moves": { "1": 49, "2": 50, "6": 59 } },
+            { "number": 43, "name": "Duyên Giác Thừa, Tích lũy", "moves": { "1": 52, "2": 44, "3": 28, "4": 38, "5": 13, "6": 6 } },
+            { "number": 44, "name": "Duyên Giác Thừa, Gia Hạnh", "moves": { "1": 30, "2": 46, "3": 45, "4": 20, "5": 39, "6": 27 } },
+            { "number": 45, "name": "Duyên Giác Thừa, Kiến", "moves": { "1": 52, "2": 47, "3": 46, "4": 40, "5": 17, "6": 28 } },
+            { "number": 46, "name": "Duyên Giác Thừa, Tu", "moves": { "1": 30, "2": 47, "3": 37, "4": 35, "5": 51, "6": 29 } },
             { "number": 47, "name": "Duyên Giác Thừa, A-la-hán", "moves": { "1": 52, "2": 48, "3": 30, "4": 37 } },
             { "number": 48, "name": "Niết Bàn Vô Dư", "moves": {} },
-            { "number": 49, "name": "Tantra, Gia Hạnh Đạo: Nhiệt", "moves": { "1": 50, "2": 57 } },
-            { "number": 50, "name": "Tantra, Gia Hạnh Đạo: Đỉnh điểm", "moves": { "1": 57, "2": 66 } },
+            { "number": 49, "name": "Tantra, Gia Hạnh: Nhiệt", "moves": { "1": 50, "2": 57 } },
+            { "number": 50, "name": "Tantra, Gia Hạnh: Đỉnh điểm", "moves": { "1": 57, "2": 66 } },
             { "number": 51, "name": "Thanh Văn, A-la-hán", "moves": { "1": 52, "2": 48, "3": 37 } },
-            { "number": 52, "name": "Đại Thừa, Tiểu Tích lũy Đạo", "moves": { "1": 54, "2": 53, "3": 30, "4": 38, "5": 11, "6": 7 } },
-            { "number": 53, "name": "Đại Thừa, Tích lũy Đạo Trung cấp", "moves": { "1": 55, "2": 54, "3": 37, "4": 40, "5": 15, "6": 8 } },
-            { "number": 54, "name": "Đại Thừa, Tích lũy Đạo Cao hơn", "moves": { "1": 63, "2": 55, "3": 60, "4": 59 } },
-            { "number": 55, "name": "Đại Thừa, Gia Hạnh Đạo: Nhiệt", "moves": { "1": 63, "2": 56 } },
-            { "number": 56, "name": "Đại Thừa, Gia Hạnh Đạo: Đỉnh điểm", "moves": { "1": 64, "2": 63 } },
-            { "number": 57, "name": "Tantra, Gia Hạnh Đạo: Khả tiếp", "moves": { "1": 66, "2": 73, "3": 58, "4": 77 } },
-            { "number": 58, "name": "Tantra, Gia Hạnh Đạo: Giáo lý Cao nhất", "moves": { "1": 73, "2": 74, "3": 66, "4": 85 } },
-            { "number": 59, "name": "Shambhala", "moves": { "1": 63, "2": 50, "3": 60, "4": 49, "5": 42, "6": 55 } },
-            { "number": 60, "name": "Potala", "moves": { "1": 64, "2": 63, "3": 42 } },
-            { "number": 61, "name": "Urgyan", "moves": { "1": 89, "2": 84, "3": 83 } },
-            { "number": 62, "name": "Bậc Trí Giữ Giới Ấn Độ giáo", "moves": { "1": 52, "2": 38 } },
-            { "number": 63, "name": "Đại Thừa, Gia Hạnh Đạo: Khả tiếp", "moves": { "1": 85, "2": 42, "3": 64, "4": 77 } },
-            { "number": 64, "name": "Đại Thừa, Gia Hạnh Đạo: Giáo lý Cao nhất", "moves": { "1": 71, "2": 49, "5": 77 } },
-            { "number": 65, "name": "Bậc Trí Giữ Giới Truyền Thống Bôn", "moves": { "1": 52, "2": 43, "5": 15, "6": 8 } },
+            { "number": 52, "name": "Đại Thừa, Tiểu Tích lũy", "moves": { "1": 54, "2": 53, "3": 30, "4": 38, "5": 11, "6": 7 } },
+            { "number": 53, "name": "Đại Thừa, Trung Tích lũy", "moves": { "1": 55, "2": 54, "3": 37, "4": 40, "5": 15, "6": 8 } },
+            { "number": 54, "name": "Đại Thừa, Đại Tích lũy Đạo", "moves": { "1": 63, "2": 55, "3": 60, "4": 59 } },
+            { "number": 55, "name": "Đại Thừa, Gia Hạnh Nhiệt", "moves": { "1": 63, "2": 56 } },
+            { "number": 56, "name": "Đại Thừa, Gia Hạn Đỉnh điểm", "moves": { "1": 64, "2": 63 } },
+            { "number": 57, "name": "Tantra, Gia Hạnh: Khả tiếp", "moves": { "1": 66, "2": 73, "3": 58, "4": 77 } },
+            { "number": 58, "name": "Tantra, Gia Hạnh Giáo lý Cao nhất", "moves": { "1": 73, "2": 74, "3": 66, "4": 85 } },
+            { "number": 59, "name": "Tịnh độ Shambhala", "moves": { "1": 63, "2": 50, "3": 60, "4": 49, "5": 42, "6": 55 } },
+            { "number": 60, "name": "Tịnh độ Potala", "moves": { "1": 64, "2": 63, "3": 42 } },
+            { "number": 61, "name": "Tịnh độ Urgyan", "moves": { "1": 89, "2": 84, "3": 83 } },
+            { "number": 62, "name": "Trì Minh Vương Ấn Độ giáo", "moves": { "1": 52, "2": 38 } },
+            { "number": 63, "name": "Đại Thừa, Gia Hạnh: Khả tiếp", "moves": { "1": 85, "2": 42, "3": 64, "4": 77 } },
+            { "number": 64, "name": "Đại Thừa, Gia Hạnh: Giáo lý Cao nhất", "moves": { "1": 71, "2": 49, "5": 77 } },
+            { "number": 65, "name": "Trì Minh Vương Bôn", "moves": { "1": 52, "2": 43, "5": 15, "6": 8 } },
             { "number": 66, "name": "Giai đoạn Tantra thứ nhất", "moves": { "1": 74, "2": 75, "3": 73 } },
-            { "number": 67, "name": "Bậc Trí Giữ Giới trong Cõi Dục giới", "moves": { "1": 41, "2": 42, "3": 68, "4": 69 } },
-            { "number": 68, "name": "Bậc Trí Giữ Giới trong Cõi Sắc", "moves": { "1": 42, "2": 49, "4": 59, "6": 41 } },
-            { "number": 69, "name": "Chuyển Luân Thánh Vương Tantra", "moves": { "1": 75, "2": 81 } },
-            { "number": 70, "name": "Cõi Hoàn Thành Hoạt Động", "moves": { "1": 86, "2": 73, "4": 34, "5": 74, "6": 71 } },
-            { "number": 71, "name": "Giai đoạn Sutra thứ nhất - Hoan Hỷ", "moves": { "1": 79, "2": 80, "3": 74 } },
-            { "number": 72, "name": "Bậc Trí Giữ Giới của Tám Thần Thông", "moves": { "1": 67, "2": 41, "3": 33 } },
+            { "number": 67, "name": "Trì Minh Vương Cõi Dục giới", "moves": { "1": 41, "2": 42, "3": 68, "4": 69 } },
+            { "number": 68, "name": "Trì Minh Vương Cõi Sắc", "moves": { "1": 42, "2": 49, "4": 59, "6": 41 } },
+            { "number": 69, "name": "Chuyển Luân Vương Tantra", "moves": { "1": 75, "2": 81 } },
+            { "number": 70, "name": "Bắc Phương Cực Lạc", "moves": { "1": 86, "2": 73, "4": 34, "5": 74, "6": 71 } },
+            { "number": 71, "name": "Bồ tát địa thứ nhất - Hoan Hỷ", "moves": { "1": 79, "2": 80, "3": 74 } },
+            { "number": 72, "name": "Bậc Trí Giữ Giới của 8 Thần Thông", "moves": { "1": 67, "2": 41, "3": 33 } },
             { "number": 73, "name": "Giai đoạn Tantra thứ hai", "moves": { "1": 75, "2": 81, "6": 69 } },
             { "number": 74, "name": "Giai đoạn Tantra thứ ba", "moves": { "1": 75, "2": 81 } },
             { "number": 75, "name": "Giai đoạn Tantra thứ tư", "moves": { "1": 82, "2": 83, "3": 81 } },
-            { "number": 76, "name": "Cõi Đỉnh Ngọc", "moves": { "1": 78, "2": 74, "3": 73 } },
-            { "number": 77, "name": "Cực Lạc", "moves": { "1": 71, "2": 74 } },
-            { "number": 78, "name": "Giai đoạn Sutra thứ tư - Phát quang", "moves": { "1": 87, "2": 88 } },
-            { "number": 79, "name": "Giai đoạn Sutra thứ ba - Phát huy", "moves": { "1": 88, "2": 78 } },
-            { "number": 80, "name": "Giai đoạn Sutra thứ hai - Ly cấu", "moves": { "1": 78, "2": 79 } },
+            { "number": 76, "name": "Nam Phương Cực Lạc", "moves": { "1": 78, "2": 74, "3": 73 } },
+            { "number": 77, "name": "Tây Phương Cực Lạc", "moves": { "1": 71, "2": 74 } },
+            { "number": 78, "name": "Bồ tát địa thứ tư - Phát quang", "moves": { "1": 87, "2": 88 } },
+            { "number": 79, "name": "Bồ tát địa thứ ba - Phát huy", "moves": { "1": 88, "2": 78 } },
+            { "number": 80, "name": "Bồ tát địa thứ hai - Ly cấu", "moves": { "1": 78, "2": 79 } },
             { "number": 81, "name": "Giai đoạn Tantra thứ năm", "moves": { "1": 89, "2": 90 } },
             { "number": 82, "name": "Giai đoạn Tantra thứ sáu", "moves": { "1": 84, "2": 91 } },
             { "number": 83, "name": "Giai đoạn Tantra thứ bảy", "moves": { "1": 84, "2": 93 } },
-            { "number": 84, "name": "Trời Tối Thượng", "moves": { "1": 93 } },
-            { "number": 85, "name": "Abhirati - Cõi Cực Lạc)", "moves": { "1": 71, "2": 73, "3": 76 } },
-            { "number": 86, "name": "Giai đoạn Sutra thứ bảy - Viễn hành", "moves": { "1": 95, "2": 96 } },
-            { "number": 87, "name": "Abhimukhi - Giai đoạn Sutra thứ sáu - Hiện tiền", "moves": { "1": 96, "2": 86 } },
-            { "number": 88, "name": "Giai đoạn Sutra thứ năm - Cực nan thắng", "moves": { "1": 95, "2": 87 } },
-            { "number": 89, "name": "Giai đoạn Tantra thứ tám", "moves": { "1": 84, "2": 90 } },
-            { "number": 90, "name": "Giai đoạn Tantra thứ chín", "moves": { "1": 84, "2": 91 } },
-            { "number": 91, "name": "Giai đoạn Tantra thứ mười", "moves": { "1": 84, "2": 93 } },
+            { "number": 84, "name": "Akanistha - Trời Tối Thượng", "moves": { "1": 93 } },
+            { "number": 85, "name": "Đông Phương Cực Lạc", "moves": { "1": 71, "2": 73, "3": 76 } },
+            { "number": 86, "name": "Bồ tát địa thứ bảy - Viễn hành", "moves": { "1": 95, "2": 96 } },
+            { "number": 87, "name": "Bồ tát địa thứ sáu - Hiện tiền", "moves": { "1": 96, "2": 86 } },
+            { "number": 88, "name": "Bồ tát địa thứ năm - Cực nan thắng", "moves": { "1": 95, "2": 87 } },
+            { "number": 89, "name": "Giai đoạn Tantra thứ 8", "moves": { "1": 84, "2": 90 } },
+            { "number": 90, "name": "Giai đoạn Tantra thứ 9", "moves": { "1": 84, "2": 91 } },
+            { "number": 91, "name": "Giai đoạn Tantra thứ 10", "moves": { "1": 84, "2": 93 } },
             { "number": 92, "name": "Đại Báo thân", "moves": { "1": 97 } },
             { "number": 93, "name": "Pháp thân", "moves": { "1": 92 } },
-            { "number": 94, "name": "Giai đoạn Sutra thứ mười - Pháp Vân", "moves": { "1": 93, "2": 84 } },
-            { "number": 95, "name": "Giai đoạn Sutra thứ chín - Thiện Huệ", "moves": { "1": 94, "2": 84 } },
-            { "number": 96, "name": "Giai đoạn Sutra thứ tám - Bất động", "moves": { "1": 94, "2": 95 } },
+            { "number": 94, "name": "Bồ tát địa thứ mười - Pháp Vân", "moves": { "1": 93, "2": 84 } },
+            { "number": 95, "name": "Bồ tát địa thứ chín - Thiện Huệ", "moves": { "1": 94, "2": 84 } },
+            { "number": 96, "name": "Bồ tát địa thứ tám - Bất động", "moves": { "1": 94, "2": 95 } },
             { "number": 97, "name": "Thành tựu Thân Vật lý", "moves": { "1": 98, "2": 98 } },
             { "number": 98, "name": "Xuất gia", "moves": { "1": 99, "2": 99 } },
             { "number": 99, "name": "Khổ hạnh", "moves": { "1": 100, "2": 100 } },
@@ -521,11 +539,12 @@
         squaresData.forEach(sq => boardSquaresMap.set(sq.number, sq));
 
         // --- DOM Elements ---
-        let loadingScreenEl, authOverlayEl, authStatusMessageEl, entryScreenEl, playerNameInputEl,
+        let loadingScreenEl, authOverlayEl, entryScreenEl, playerNameInputEl,
             joinGameBtnEl, entryErrorEl, gameWrapperEl, playerListAreaEl, 
             controlPanelEl, playerTurnDisplayEl, rollDiceBtnEl, leaveGameBtnEl,
             diceResultDisplayEl, diceCubeEl, meritPointsDisplayEl, meritPointsInputEl,
-            specialDiceBtnEl, updateMeritBtnEl, panelToggleButtonEl, movePlayerBtnEl, movePositionInputEl, skipTurnBtnEl;
+            specialDiceBtnEl, updateMeritBtnEl, panelToggleButtonEl, movePlayerBtnEl, movePositionInputEl, skipTurnBtnEl,
+            adminPanelEl, adminGameControlBtnEl;
             
         // --- Utility Functions ---
         function showScreen(screenElement) {
@@ -570,6 +589,7 @@
                 return;
             }
 
+            isCurrentUserAdmin = playerName.toLowerCase() === ADMIN_NAME.toLowerCase();
             joinGameBtnEl.disabled = true;
             
             const roomPath = `/artifacts/${appId}/public/data/${ROOM_COLLECTION_NAME}/${SINGLE_ROOM_ID}`;
@@ -580,17 +600,24 @@
                     const roomDoc = await transaction.get(roomRef);
                     
                     if (!roomDoc.exists()) {
-                        const newPlayer = {
-                            uid: currentUserId, name: playerName, icon: animalIconsGlobal[0], 
-                            diceRollHistory: [], meritPoints: 0, position: 24, realmHistory: [{pos: 24, type: 'start'}], isHost: true
-                        };
-                        transaction.set(roomRef, {
-                            roomId: SINGLE_ROOM_ID, players: [newPlayer], currentPlayerIndex: 0,
-                            status: "playing", lastDiceRoll: null, createdAt: serverTimestamp(),
-                            hostUid: currentUserId, lastActivity: serverTimestamp(),
-                        });
+                        if (isCurrentUserAdmin) {
+                            const newPlayer = {
+                                uid: currentUserId, name: playerName, icon: animalIconsGlobal[0], 
+                                diceRollHistory: [], meritPoints: 0, position: 24, realmHistory: [{pos: 24, type: 'start'}], isAdmin: true
+                            };
+                            transaction.set(roomRef, {
+                                roomId: SINGLE_ROOM_ID, players: [newPlayer], currentPlayerIndex: 0,
+                                status: "waiting", lastDiceRoll: null, createdAt: serverTimestamp(),
+                                hostUid: currentUserId, lastActivity: serverTimestamp(),
+                            });
+                        } else {
+                            throw new Error("Trò chơi chưa được khởi tạo bởi Admin.");
+                        }
                     } else {
                         const roomData = roomDoc.data();
+                        if (roomData.status === 'waiting' && !isCurrentUserAdmin) {
+                            throw new Error("Trò chơi chưa bắt đầu. Vui lòng chờ Admin.");
+                        }
                         if (roomData.players.find(p => p.uid === currentUserId)) {
                             return; 
                         }
@@ -600,7 +627,7 @@
                         const newPlayer = {
                             uid: currentUserId, name: playerName, 
                             icon: animalIconsGlobal[roomData.players.length % animalIconsGlobal.length],
-                            diceRollHistory: [], meritPoints: 0, position: 24, realmHistory: [{pos: 24, type: 'start'}], isHost: false
+                            diceRollHistory: [], meritPoints: 0, position: 24, realmHistory: [{pos: 24, type: 'start'}], isAdmin: isCurrentUserAdmin
                         };
                         const updatedPlayers = [...roomData.players, newPlayer];
                         transaction.update(roomRef, { players: updatedPlayers });
@@ -633,16 +660,10 @@
 
                     const updatedPlayers = roomData.players.filter(p => p.uid !== currentUserId);
 
-                    if (updatedPlayers.length === 0) {
+                    if (updatedPlayers.length === 0 || (updatedPlayers.length > 0 && roomData.hostUid === currentUserId)) {
                         transaction.delete(roomRef);
                     } else {
-                        let newHostUid = roomData.hostUid;
                         let newCurrentPlayerIndex = roomData.currentPlayerIndex;
-
-                        if (roomData.hostUid === currentUserId) {
-                            updatedPlayers[0].isHost = true;
-                            newHostUid = updatedPlayers[0].uid;
-                        }
                         
                         if (leavingPlayerIndex < newCurrentPlayerIndex) {
                             newCurrentPlayerIndex--;
@@ -652,7 +673,6 @@
 
                         transaction.update(roomRef, { 
                             players: updatedPlayers,
-                            hostUid: newHostUid,
                             currentPlayerIndex: newCurrentPlayerIndex,
                         });
                     }
@@ -683,6 +703,9 @@
                     }
                 } else {
                     localGameState = {};
+                    if (!isCurrentUserAdmin) {
+                        alert("Trò chơi đã kết thúc bởi Admin.");
+                    }
                     showScreen(entryScreenEl);
                 }
             }, (error) => {
@@ -717,17 +740,20 @@
                 const squareData = boardSquaresMap.get(currentPos);
                 const squareName = squareData ? squareData.name : "Không xác định";
 
+                const kickButtonHTML = isCurrentUserAdmin && !player.isAdmin ? 
+                    `<button class="kick-btn" data-uid="${player.uid}">Kick</button>` : '';
+
                 playerCard.innerHTML = `
                     <div class="player-card-header">
                         <div class="player-info">
                             <span class="player-icon">${player.icon}</span>
                             <div class="player-name-pos">
-                                <span class="player-name">${player.name}</span>
+                                <span class="player-name">${player.name} ${player.isAdmin ? ' (Admin)' : ''}</span>
                                 <span class="player-position-text">Vị trí: ${currentPos}. ${squareName}</span>
                             </div>
                         </div>
                         <div class="player-merit">
-                            ${player.meritPoints || 0} Công đức
+                            ${player.meritPoints || 0} Công đức ${kickButtonHTML}
                         </div>
                     </div>
                     <div class="history-label">Lịch sử Cảnh giới:</div>
@@ -736,6 +762,14 @@
                     <div class="history-rolls">${diceHistoryHTML}</div>
                 `;
                 playerListAreaEl.appendChild(playerCard);
+            });
+
+             // Add event listeners for new kick buttons
+            document.querySelectorAll('.kick-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const uidToKick = e.target.dataset.uid;
+                    handleKickPlayerClick(uidToKick);
+                });
             });
         }
         
@@ -761,6 +795,17 @@
             }
 
             diceResultDisplayEl.textContent = roomData.lastDiceRoll || '?';
+
+            if (isCurrentUserAdmin) {
+                adminPanelEl.classList.remove('hidden');
+                if (roomData.status === 'playing') {
+                    adminGameControlBtnEl.textContent = 'Kết thúc Trò chơi';
+                } else {
+                    adminGameControlBtnEl.textContent = 'Bắt đầu Trò chơi';
+                }
+            } else {
+                adminPanelEl.classList.add('hidden');
+            }
         }
 
         async function handleRollDiceClick() {
@@ -961,15 +1006,51 @@
                 movePlayerBtnEl.disabled = false;
             }
         }
+
+        async function handleAdminGameControlClick() {
+            if (!isCurrentUserAdmin) return;
+            const roomPath = `/artifacts/${appId}/public/data/${ROOM_COLLECTION_NAME}/${SINGLE_ROOM_ID}`;
+            const roomRef = doc(db, roomPath);
+            
+            adminGameControlBtnEl.disabled = true;
+            const roomDoc = await getDoc(roomRef);
+            if (roomDoc.exists()) {
+                const roomData = roomDoc.data();
+                if (roomData.status === 'playing') {
+                    // End the game by deleting the room
+                    await deleteDoc(roomRef);
+                } else {
+                    // Start the game
+                    await updateDoc(roomRef, { status: 'playing' });
+                }
+            }
+             adminGameControlBtnEl.disabled = false;
+        }
+
+        async function handleKickPlayerClick(uidToKick) {
+            if (!isCurrentUserAdmin || !localGameState || !localGameState.players) return;
+
+            let newPlayersArray = localGameState.players.filter(p => p.uid !== uidToKick);
+            const roomPath = `/artifacts/${appId}/public/data/${ROOM_COLLECTION_NAME}/${SINGLE_ROOM_ID}`;
+            const roomRef = doc(db, roomPath);
+            try {
+                await updateDoc(roomRef, {
+                    players: newPlayersArray,
+                    currentPlayerIndex: localGameState.currentPlayerIndex % newPlayersArray.length,
+                    lastActivity: serverTimestamp()
+                });
+            } catch (error) {
+                console.error("Error kicking player:", error);
+            }
+        }
         
         document.addEventListener('DOMContentLoaded', async () => {
             // DOM Element selections
             loadingScreenEl = document.getElementById('loadingScreen');
             authOverlayEl = document.getElementById('authOverlay');
-            authStatusMessageEl = document.getElementById('authStatusMessage');
             entryScreenEl = document.getElementById('entryScreen');
             playerNameInputEl = document.getElementById('playerNameInput');
-            joinGameBtnEl = document.getElementById('joinGameBtn');
+            joinGameBtnEl = document.getElementById('joinGameBtn'); 
             entryErrorEl = document.getElementById('entryError');
             gameWrapperEl = document.querySelector('.game-wrapper');
             playerListAreaEl = document.getElementById('playerListArea');
@@ -987,6 +1068,8 @@
             movePlayerBtnEl = document.getElementById('movePlayerBtn');
             movePositionInputEl = document.getElementById('movePositionInput');
             skipTurnBtnEl = document.getElementById('skipTurnBtn');
+            adminPanelEl = document.getElementById('adminPanel');
+            adminGameControlBtnEl = document.getElementById('adminGameControlBtn');
 
             if (!firebaseConfig) {
                 loadingScreenEl.innerHTML = "<p>Lỗi cấu hình Firebase. Không thể tải trò chơi.</p>";
@@ -1007,13 +1090,9 @@
             onAuthStateChanged(auth, async (user) => {
                 if (user) {
                     currentUserId = user.uid;
-                    authStatusMessageEl.textContent = `Đã xác thực.`; 
-                    setTimeout(() => { 
-                        showScreen(entryScreenEl);
-                        loadingScreenEl.style.display = 'none'; 
-                    }, 500);
+                    showScreen(entryScreenEl);
+                    loadingScreenEl.style.display = 'none';
                 } else {
-                    authStatusMessageEl.textContent = "Đang đăng nhập ẩn danh...";
                     try {
                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                             await signInWithCustomToken(auth, __initial_auth_token);
@@ -1021,7 +1100,8 @@
                             await signInAnonymously(auth);
                         }
                     } catch (error) {
-                        authStatusMessageEl.textContent = "Lỗi đăng nhập: " + error.message;
+                       showScreen(loadingScreenEl);
+                       loadingScreenEl.innerHTML = "<p>Lỗi xác thực. Vui lòng tải lại trang.</p>";
                     }
                 }
             });
@@ -1034,6 +1114,7 @@
             if(updateMeritBtnEl) updateMeritBtnEl.addEventListener('click', handleUpdateMeritClick);
             if(leaveGameBtnEl) leaveGameBtnEl.addEventListener('click', leaveGame);
             if(movePlayerBtnEl) movePlayerBtnEl.addEventListener('click', handleMovePlayerClick);
+            if(adminGameControlBtnEl) adminGameControlBtnEl.addEventListener('click', handleAdminGameControlClick);
             if(panelToggleButtonEl) panelToggleButtonEl.addEventListener('click', () => {
                 controlPanelEl.classList.toggle('collapsed');
                 panelToggleButtonEl.classList.toggle('collapsed');
