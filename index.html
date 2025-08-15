@@ -417,9 +417,28 @@
         const MAX_PLAYERS = 10;
         const ROOM_COLLECTION_NAME = "rebirth_game_single_room_v14";
         const ADMIN_NAME = "Tsering Gesar";
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        
+const ROOM_COLLECTION_NAME = "game_room";
+        // Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyAO08-aOuCFzmj8WwbX6MDkDipWtRJ6z_Q",
+  authDomain: "maratika-rebird-game.firebaseapp.com",
+  projectId: "maratika-rebird-game",
+  storageBucket: "maratika-rebird-game.firebasestorage.app",
+  messagingSenderId: "876143692916",
+  appId: "1:876143692916:web:166d98a1243facf0019521",
+  measurementId: "G-V70SSVYEXD"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);        
         let db, auth;
         let currentUserId = null;
         let isCurrentUserAdmin = false;
@@ -1087,24 +1106,20 @@
 
             showScreen(authOverlayEl); 
 
-            onAuthStateChanged(auth, async (user) => {
-                if (user) {
-                    currentUserId = user.uid;
-                    showScreen(entryScreenEl);
-                    loadingScreenEl.style.display = 'none';
-                } else {
-                    try {
-                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                            await signInWithCustomToken(auth, __initial_auth_token);
-                        } else {
-                            await signInAnonymously(auth);
-                        }
-                    } catch (error) {
-                       showScreen(loadingScreenEl);
-                       loadingScreenEl.innerHTML = "<p>Lỗi xác thực. Vui lòng tải lại trang.</p>";
-                    }
-                }
-            });
+onAuthStateChanged(auth, async (user) => {
+    if (user) {
+        currentUserId = user.uid;
+        showScreen(entryScreenEl);
+        loadingScreenEl.style.display = 'none';
+    } else {
+        try {
+            await signInAnonymously(auth);
+        } catch (error) {
+           showScreen(loadingScreenEl);
+           loadingScreenEl.innerHTML = "<p>Lỗi xác thực. Vui lòng tải lại trang.</p>";
+        }
+    }
+});
             
             // Event listeners
             if(joinGameBtnEl) joinGameBtnEl.addEventListener('click', joinGame);
