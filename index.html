@@ -140,6 +140,7 @@
             font-weight: bold;
             font-size: 1rem;
             color: #3e2723;
+            cursor: help; /* Add cursor for tooltip */
         }
         .special-roll { background-color: #ffcdd2; color: #c62828; border-color: #ef9a9a; }
         .manual-move { background-color: #ffcdd2; color: #c62828; border-color: #ef9a9a; }
@@ -284,17 +285,20 @@
         #notificationModal .overlay-content {
             max-width: 500px;
         }
-        #notificationIcon {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-        }
         #notificationTitle {
             font-size: 1.5rem;
             font-weight: bold;
-            margin-bottom: 0.5rem;
+            color: #5d4037;
+        }
+        #notificationResult {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin: 0.5rem 0;
         }
         #notificationMessage {
-            font-size: 1rem;
+            font-size: 0.9rem;
+            font-style: italic;
+            color: #6d4c41;
         }
 
         /* Mobile-first Control Panel */
@@ -430,8 +434,8 @@
     <!-- Notification Modal -->
     <div id="notificationModal" class="full-screen-overlay">
         <div class="overlay-content">
-            <div id="notificationIcon"></div>
             <h2 id="notificationTitle" class="text-2xl font-bold"></h2>
+            <p id="notificationResult"></p>
             <p id="notificationMessage"></p>
             <button id="closeNotificationBtn" class="mt-4">Đã hiểu</button>
         </div>
@@ -592,7 +596,7 @@ const app = initializeApp(firebaseConfig);
             diceResultDisplayEl, diceCubeEl, meritPointsDisplayEl, meritPointsInputEl,
             specialDiceBtnEl, updateMeritBtnEl, panelToggleButtonEl, movePlayerBtnEl, movePositionInputEl, skipTurnBtnEl,
             adminPanelEl, adminGameControlBtnEl,
-            notificationModalEl, notificationIconEl, notificationTitleEl, notificationMessageEl, closeNotificationBtnEl;
+            notificationModalEl, notificationIconEl, notificationTitleEl, notificationMessageEl, closeNotificationBtnEl, notificationResultEl;
             
         // --- Utility Functions ---
         function showScreen(screenElement) {
@@ -625,9 +629,36 @@ const app = initializeApp(firebaseConfig);
             return '';
         }
 
-        function showNotification(icon, title, message) {
-            notificationIconEl.textContent = icon;
+        function generateKarmaSummary(oldSquare, newSquare, roll) {
+            const oldCategory = getRealmCategory(oldSquare.number);
+            const newCategory = getRealmCategory(newSquare.number);
+
+            if (oldSquare.number === newSquare.number) {
+                 switch (roll) {
+                    case 1: return `Cực thiện nghiệp trổ quả! Dù vẫn ở lại ${oldSquare.name}, tâm bạn đã chuyển hóa, tạo ra phước báu vô lượng cho kiếp sau.`;
+                    case 2: return `Thiện nghiệp to lớn từ quá khứ giúp bạn có một kiếp sống an lành tại ${oldSquare.name}, tiếp tục tích lũy tư lương.`;
+                    case 3: return `Nghiệp thiện ác cân bằng, bạn có một kiếp sống bình thường tại ${oldSquare.name} để tiếp tục quán chiếu.`;
+                    case 4: return `Một vài chướng ngại nhỏ từ ác nghiệp khiến bạn chưa thể thoát khỏi ${oldSquare.name}. Hãy tinh tấn hơn nữa.`;
+                    case 5: return `Ác nghiệp nặng nề đang hiển hiện, trói buộc bạn thêm một kiếp nữa trong cảnh giới ${oldSquare.name}.`;
+                    case 6: return `Cực ác nghiệp đã chín muồi! Nghiệp lực sâu dày tại ${oldSquare.name} khiến bạn khó có thể thoát ra trong kiếp này.`;
+                }
+            }
+            
+            switch (roll) {
+                case 1: return `Cực thiện nghiệp trổ quả! Một nhân duyên hy hữu đã đưa bạn từ ${oldSquare.name} thẳng đến cảnh giới an lành ${newSquare.name}.`;
+                case 2: return `Thiện nghiệp to lớn từ quá khứ đã chín muồi, giúp bạn thoát khỏi ${oldSquare.name} và tái sinh về ${newSquare.name}.`;
+                case 3: return `Nghiệp thiện ác cân bằng, duyên nghiệp đã đưa bạn từ ${oldSquare.name} đến với một kiếp sống mới tại ${newSquare.name}.`;
+                case 4: return `Một vài chướng ngại nhỏ từ ác nghiệp trong kiếp sống ở ${oldSquare.name} đã dẫn dắt bạn đến với ${newSquare.name}.`;
+                case 5: return `Ác nghiệp nặng nề từ ${oldSquare.name} đã hiển hiện, kéo bạn đến với cảnh giới ${newSquare.name}.`;
+                case 6: return `Cực ác nghiệp đã chín muồi! Nghiệp lực sâu dày từ ${oldSquare.name} đã đẩy bạn đọa vào ${newSquare.name}.`;
+            }
+            return `Từ ${oldSquare.name}, nghiệp duyên đã dẫn dắt bạn đến với kiếp sống mới tại ${newSquare.name}.`;
+        }
+
+
+        function showNotification(title, resultText, message) {
             notificationTitleEl.textContent = title;
+            notificationResultEl.textContent = resultText;
             notificationMessageEl.textContent = message;
             notificationModalEl.style.display = 'flex';
         }
@@ -788,7 +819,9 @@ const app = initializeApp(firebaseConfig);
                 const realmHistoryHTML = (player.realmHistory || []).map(realmData => {
                     const realmCategory = getRealmCategory(realmData.pos);
                     const isPureLand = realmCategory === 'pureland';
-                    return `<div class="roll-item realm-${realmCategory} ${realmData.type === 'manual' ? 'manual-move' : ''}">${realmData.pos}${isPureLand ? '🪷' : ''}</div>`;
+                    const squareInfo = boardSquaresMap.get(realmData.pos);
+                    const title = squareInfo ? `${realmData.pos}. ${squareInfo.name}` : `Ô ${realmData.pos}`;
+                    return `<div class="roll-item realm-${realmCategory} ${realmData.type === 'manual' ? 'manual-move' : ''}" title="${title}">${realmData.pos}${isPureLand ? '🪷' : ''}</div>`;
                 }).join('');
 
                 const currentPos = player.position || 24;
@@ -889,13 +922,14 @@ const app = initializeApp(firebaseConfig);
                 let newPlayersArray = JSON.parse(JSON.stringify(localGameState.players)); 
                 let playerToUpdate = newPlayersArray.find(p => p.uid === currentUserId);
                 let isGoodRoll = false;
-                let notification = { icon: '🎲', title: 'Kết quả Gieo', message: '' };
+                let notification = { title: 'Kết quả Gieo', result: '', message: '' };
                 
                 if(playerToUpdate) {
                     if (!playerToUpdate.diceRollHistory) playerToUpdate.diceRollHistory = [];
                     if (!playerToUpdate.realmHistory) playerToUpdate.realmHistory = [];
                     
                     const oldPosition = playerToUpdate.position || 24;
+                    const oldSquare = boardSquaresMap.get(oldPosition);
                     const oldRealmCategory = getRealmCategory(oldPosition);
 
                     // Merit point rules for staying in a realm
@@ -911,37 +945,37 @@ const app = initializeApp(firebaseConfig);
                         isGoodRoll = true;
                         const meritGained = (roll === 1 ? 2 : 1);
                         playerToUpdate.meritPoints = (playerToUpdate.meritPoints || 0) + meritGained;
-                        notification = { icon: '🙏', title: 'Tán thán Công đức!', message: `Nhờ phước báu, bạn nhận được ${meritGained} công đức.` };
+                        notification = { title: 'Tán thán Công đức!', result: `+${meritGained} công đức`, message: `Nhờ phước báu, bạn nhận được ${meritGained} công đức.` };
                     }
                     playerToUpdate.diceRollHistory.push({ value: roll, type: 'normal', isGoodRoll: isGoodRoll });
 
-                    const currentSqData = boardSquaresMap.get(oldPosition);
                     let nextSquareNumber = oldPosition;
-                    if (currentSqData && currentSqData.moves) {
-                        const movedTo = currentSqData.moves[roll.toString()];
+                    if (oldSquare && oldSquare.moves) {
+                        const movedTo = oldSquare.moves[roll.toString()];
                         if (movedTo !== undefined) {
                             nextSquareNumber = movedTo;
                         }
                     }
+                    const newSquare = boardSquaresMap.get(nextSquareNumber);
+                    notification.result = notification.result || `Gieo được ${roll}, đến cõi ${newSquare.name}`;
 
                     if (nextSquareNumber !== oldPosition) {
                         playerToUpdate.position = nextSquareNumber;
                         playerToUpdate.realmHistory.push({ pos: nextSquareNumber, type: 'normal' });
                         const newRealmCategory = getRealmCategory(nextSquareNumber);
                         
-                        // Merit point rules for arriving at a new realm
-                        if ([26, 62, 65, 67, 68, 69, 72].includes(nextSquareNumber)) { // Trì minh vương & Chuyển luân vương
+                        if ([26, 62, 65, 67, 68, 69, 72].includes(nextSquareNumber)) { 
                             const arrivalMerit = (nextSquareNumber === 26) ? 10 : 5;
                             playerToUpdate.meritPoints = (playerToUpdate.meritPoints || 0) + arrivalMerit;
-                            notification = { icon: '👑', title: 'Thành tựu!', message: `Bạn đã trở thành Chuyển Luân/Trì Minh Vương và nhận ${arrivalMerit} công đức.` };
+                            notification.title = 'Thành tựu!';
+                            notification.message = `Bạn đã trở thành Chuyển Luân/Trì Minh Vương và nhận ${arrivalMerit} công đức.`;
                         } else if (newRealmCategory === 'hell' || newRealmCategory === 'preta') {
-                            notification = { icon: '😢', title: 'Quả báo đã trổ!', message: `Nghiệp bất thiện đã đưa bạn đến cảnh giới khổ đau.` };
+                            notification.title = 'Quả báo đã trổ!';
                         } else if (newRealmCategory === 'deva' || newRealmCategory === 'pureland') {
-                            notification = { icon: '🎉', title: 'Chúc mừng!', message: `Phước báu đã đưa bạn đến một cảnh giới an lành.` };
+                            notification.title = 'Chúc mừng!';
                         }
-                    } else {
-                         notification.message = `Bạn gieo được ${roll} và vẫn ở lại cảnh giới hiện tại.`;
                     }
+                    notification.message = notification.message || generateKarmaSummary(oldSquare, newSquare, roll);
                 }
 
                 const nextPlayerIndex = (localGameState.currentPlayerIndex + 1) % newPlayersArray.length;
@@ -955,7 +989,7 @@ const app = initializeApp(firebaseConfig);
                         lastDiceRoll: roll,
                         lastActivity: serverTimestamp()
                     });
-                    showNotification(notification.icon, notification.title, notification.message);
+                    showNotification(notification.title, notification.result, notification.message);
                 } catch (error) {
                     console.error("Error updating game state:", error);
                     rollDiceBtnEl.disabled = false; 
@@ -1161,6 +1195,7 @@ const app = initializeApp(firebaseConfig);
             notificationModalEl = document.getElementById('notificationModal');
             notificationIconEl = document.getElementById('notificationIcon');
             notificationTitleEl = document.getElementById('notificationTitle');
+            notificationResultEl = document.getElementById('notificationResult');
             notificationMessageEl = document.getElementById('notificationMessage');
             closeNotificationBtnEl = document.getElementById('closeNotificationBtn');
 
@@ -1170,7 +1205,7 @@ const app = initializeApp(firebaseConfig);
             }
             
             try {
-                const app = initializeApp(firebaseConfig);
+                // const app = initializeApp(firebaseConfig); // Already initialized globally
                 auth = getAuth(app);
                 db = getFirestore(app);
             } catch (e) {
