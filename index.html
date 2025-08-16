@@ -125,6 +125,7 @@
         .player-name { font-size: 0.9rem; color: #8c6b4f; }
         .player-position-text { font-size: 1.1rem; font-weight: bold; color: #5d4037; text-transform: uppercase; }
         .player-merit { font-size: 0.9rem; font-weight: bold; color: #2e7d32; }
+        .negative-merit { color: #c62828; }
         
         .history-label { font-size: 0.8rem; font-weight: 600; color: #8c6b4f; text-transform: uppercase; margin: 10px 0 5px 0; }
         .history-rolls { display: flex; flex-wrap: wrap; gap: 8px; min-height: 30px; }
@@ -143,6 +144,7 @@
             cursor: help; /* Add cursor for tooltip */
         }
         .special-roll { background-color: #ffcdd2; color: #c62828; border-color: #ef9a9a; }
+        .prayer-roll { background-color: #d1c4e9; color: #4527a0; border-color: #b39ddb; }
         .manual-move { background-color: #ffcdd2; color: #c62828; border-color: #ef9a9a; }
         .good-roll { background-color: #c8e6c9; color: #2e7d32; border-color: #a5d6a7; }
 
@@ -170,6 +172,7 @@
         }
         
         #playerTurnDisplay { font-weight: bold; font-size: 1.2rem; margin-bottom: 10px; color: #5d4037; }
+        #skipTurnInfo { font-size: 0.9rem; color: #c62828; font-weight: bold; margin-bottom: 10px; }
         
         .dice-container {
             width: 50px;
@@ -219,9 +222,7 @@
         .section-divider {
             border-top: 2px solid #d7c8a0; margin-top: 15px; padding-top: 15px;
         }
-        .merit-display { font-size: 1rem; margin-bottom: 10px; }
-        .merit-display span { font-weight: bold; font-size: 1.1rem; color: #2e7d32; }
-        .controls-group { display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .controls-group { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px; margin-bottom: 10px; }
         .radio-group { display: flex; gap: 10px; }
         .radio-group label {
             padding: 5px 10px; border: 1px solid #b08d57; border-radius: 5px;
@@ -235,14 +236,15 @@
             width: 70px; text-align: center; font-weight: bold;
             border: 1px solid #b08d57; border-radius: 5px; padding: 5px;
         }
+        .text-input {
+            width: 120px; border: 1px solid #b08d57; border-radius: 5px; padding: 5px;
+        }
         .action-buttons { display: flex; justify-content: center; gap: 10px; }
-        .action-buttons button {
+        .action-buttons button, .player-actions button {
             padding: 8px 12px; border-radius: 6px; border: none;
             cursor: pointer; color: white; font-size: 0.9rem;
         }
-        #updateMeritBtn { background-color: #2e7d32; box-shadow: 0 3px #1b5e20; }
-        #specialDiceBtn { background-color: #4a90e2; box-shadow: 0 3px #357ABD; }
-        #movePlayerBtn { background-color: #f57c00; box-shadow: 0 3px #e65100; }
+        #challengeBtn { background-color: #4a90e2; box-shadow: 0 3px #357ABD; }
         #leaveGameBtn { background-color: #d32f2f; box-shadow: 0 3px #b71c1c; margin-top: 15px; }
         .kick-btn {
             background-color: #d32f2f; color: white; border: none;
@@ -252,8 +254,9 @@
         #adminPanel button {
              background-color: #6d4c41; color: white; padding: 10px 15px;
              border: none; border-radius: 8px; font-size: 1rem;
-             width: 100%;
+             width: 100%; margin-top: 10px;
         }
+        #adminPanel .action-buttons button { font-size: 0.9rem; }
 
         #panelToggleButton {
             display: none; /* Hidden by default, shown only on mobile */
@@ -279,10 +282,10 @@
             transform: rotate(180deg);
         }
         
-        #notificationModal {
+        #notificationModal, #prayerModal {
             display: none;
         }
-        #notificationModal .overlay-content {
+        #notificationModal .overlay-content, #prayerModal .overlay-content {
             max-width: 500px;
         }
         #notificationTitle {
@@ -346,7 +349,7 @@
 <body>
     <header class="main-header">
         <h1>Game Tái Sinh - Kho dữ liệu vũ trụ Akashic</h1>
-        <p>Design by Maratika Vietnam</p>
+        <p>(Design by Maratika Vietnam)</p>
     </header>
 
     <div id="loadingScreen" class="loading-screen">
@@ -385,6 +388,7 @@
                 </svg>
             </button>
             <div id="playerTurnDisplay"></div>
+            <div id="skipTurnInfo" class="hidden"></div>
             <div class="dice-container">
                 <div id="diceResultDisplay">?</div>
                 <div class="dice-cube" id="diceCube">
@@ -394,36 +398,35 @@
                 </div>
             </div>
             <div class="main-actions">
-                <button id="rollDiceBtn">Kết thúc Kiếp Sống</button>
+                <button id="rollDiceBtn">Kết thúc 1 Kiếp</button>
                 <button id="skipTurnBtn">Tiếp Tục Kiếp Sống</button>
             </div>
             
-            <div class="section-divider">
-                <div class="controls-group">
-                    <input type="number" id="movePositionInput" class="number-input" value="1" min="1" max="104">
-                    <button id="movePlayerBtn" class="action-buttons">PHOWA</button>
-                </div>
+            <div class="player-actions section-divider">
+                 <button id="challengeBtn" disabled>Challenge</button>
+                 <button id="requestSalvationBtn" class="hidden">Thỉnh cầu Cứu độ</button>
+                 <button id="practicePrayBtn" class="hidden">Thực hành & Cầu nguyện</button>
+                 <button id="salvationBtn" class="hidden">Cứu độ Chúng sinh</button>
             </div>
 
-            <div class="section-divider">
-                <div class="merit-display">Công đức tích lũy: <span id="meritPointsDisplay">0</span></div>
-                <div class="controls-group">
-                    <div class="radio-group">
-                        <input type="radio" id="meritIncrease" name="meritAction" value="increase" checked>
-                        <label for="meritIncrease">Tăng</label>
-                        <input type="radio" id="meritDecrease" name="meritAction" value="decrease">
-                        <label for="meritDecrease">Giảm</label>
-                    </div>
-                    <input type="number" id="meritPointsInput" class="number-input" value="1" min="1">
-                </div>
-                <div class="action-buttons">
-                    <button id="updateMeritBtn">Công Đức</button>
-                    <button id="specialDiceBtn">Gieo đặc biệt</button>
-                </div>
-            </div>
-            
             <div id="adminPanel" class="section-divider hidden">
-                <h3 class="font-bold mb-2">Bảng MARA</h3>
+                <h3 class="font-bold mb-2">Bảng Admin</h3>
+                <div class="controls-group">
+                    <input type="text" id="adminPlayerNameInput" class="text-input" placeholder="Tên người chơi">
+                    <input type="number" id="adminPositionInput" class="number-input" value="1" min="1" max="104">
+                    <button id="adminMovePlayerBtn" class="action-buttons">PHOWA</button>
+                </div>
+                <div class="controls-group">
+                    <input type="text" id="adminMeritPlayerNameInput" class="text-input" placeholder="Tên người chơi">
+                    <div class="radio-group">
+                        <input type="radio" id="adminMeritIncrease" name="adminMeritAction" value="increase" checked>
+                        <label for="adminMeritIncrease">Tăng</label>
+                        <input type="radio" id="adminMeritDecrease" name="adminMeritAction" value="decrease">
+                        <label for="adminMeritDecrease">Giảm</label>
+                    </div>
+                    <input type="number" id="adminMeritPointsInput" class="number-input" value="1" min="1">
+                </div>
+                <button id="adminUpdateMeritBtn" class="action-buttons">Công Đức</button>
                 <button id="adminGameControlBtn">Bắt đầu Trò chơi</button>
             </div>
 
@@ -438,6 +441,18 @@
             <p id="notificationResult"></p>
             <p id="notificationMessage"></p>
             <button id="closeNotificationBtn" class="mt-4">Đã hiểu</button>
+        </div>
+    </div>
+
+    <!-- Prayer Modal -->
+    <div id="prayerModal" class="full-screen-overlay">
+        <div class="overlay-content">
+            <h2 class="text-2xl font-bold">Cầu nguyện Tái sinh</h2>
+            <p>Bạn có muốn dùng 5 công đức để cầu nguyện cho một tái sinh tốt đẹp hơn không?</p>
+            <div class="flex justify-center gap-4 mt-4">
+                <button id="confirmPrayerBtn">Đồng ý (-5 CĐ)</button>
+                <button id="cancelPrayerBtn">Từ chối</button>
+            </div>
         </div>
     </div>
     
@@ -468,7 +483,7 @@ const app = initializeApp(firebaseConfig);
         const SINGLE_ROOM_ID = "maratika_main_rebirth_room";
         const MAX_PLAYERS = 13;
         // BƯỚC 2: Đổi tên collection nếu bạn muốn có một phòng chơi mới hoàn toàn
-        const ROOM_COLLECTION_NAME = "game_room";
+        const ROOM_COLLECTION_NAME = "game_room_v2";
         const ADMIN_NAME = "Tsering Gesar";
         
         let db, auth;
@@ -481,14 +496,14 @@ const app = initializeApp(firebaseConfig);
         
         const squaresData = [
             // Dữ liệu 104 ô được giữ nguyên như trước
-            { "number": 1, "name": "Địa ngục Kim Cương", "moves": {} },
-            { "number": 2, "name": "Địa ngục Vô Gián", "moves": { "1": 17, "2": 10, "3": 3 } },
-            { "number": 3, "name": "Địa ngục Nóng", "moves": { "1": 11, "2": 10, "3": 8, "4": 7, "5": 5, "6": 2 } },
-            { "number": 4, "name": "Địa ngục Gào hét", "moves": { "1": 13, "2": 10, "3": 8, "4": 6, "5": 5, "6": 3 } },
-            { "number": 5, "name": "Địa ngục Nghiền Ép", "moves": { "1": 13, "2": 11, "3": 10, "4": 7, "5": 4, "6": 3 } },
-            { "number": 6, "name": "Địa ngục Phục sinh", "moves": { "1": 17, "2": 12, "3": 10, "4": 8, "5": 5, "6": 4 } },
-            { "number": 7, "name": "Địa ngục Lạnh", "moves": { "1": 15, "2": 18, "3": 11, "4": 10, "5": 6, "6": 5 } },
-            { "number": 8, "name": "Địa ngục Tạm thời", "moves": { "1": 27, "2": 19, "3": 14, "4": 11, "5": 7, "6": 6 } },
+            { "number": 1, "name": "Địa ngục Kim Cương", "moves": {}, "skipTurns": 6 },
+            { "number": 2, "name": "Địa ngục Vô Gián", "moves": { "1": 17, "2": 10, "3": 3 }, "skipTurns": 4 },
+            { "number": 3, "name": "Địa ngục Nóng", "moves": { "1": 11, "2": 10, "3": 8, "4": 7, "5": 5, "6": 2 }, "skipTurns": 3 },
+            { "number": 4, "name": "Địa ngục Gào hét", "moves": { "1": 13, "2": 10, "3": 8, "4": 6, "5": 5, "6": 3 }, "skipTurns": 3 },
+            { "number": 5, "name": "Địa ngục Nghiền Ép", "moves": { "1": 13, "2": 11, "3": 10, "4": 7, "5": 4, "6": 3 }, "skipTurns": 2 },
+            { "number": 6, "name": "Địa ngục Phục sinh", "moves": { "1": 17, "2": 12, "3": 10, "4": 8, "5": 5, "6": 4 }, "skipTurns": 2 },
+            { "number": 7, "name": "Địa ngục Lạnh", "moves": { "1": 15, "2": 18, "3": 11, "4": 10, "5": 6, "6": 5 }, "skipTurns": 2 },
+            { "number": 8, "name": "Địa ngục Tạm thời", "moves": { "1": 27, "2": 19, "3": 14, "4": 11, "5": 7, "6": 6 }, "skipTurns": 1 },
             { "number": 9, "name": "Diêm Vương", "moves": { "1": 42, "2": 34 } },
             { "number": 10, "name": "Ngạ Quỷ", "moves": { "1": 19, "2": 13, "3": 14, "4": 11, "5": 8, "6": 4 } },
             { "number": 11, "name": "Súc Sinh", "moves": { "1": 27, "2": 17, "3": 12, "4": 13, "5": 10, "6": 5 } },
@@ -508,11 +523,11 @@ const app = initializeApp(firebaseConfig);
             { "number": 25, "name": "Bắt đầu Con đường Tantra", "moves": { "1": 72, "2": 33, "6": 38 } },
             { "number": 26, "name": "Chuyển Luân Thánh Vương", "moves": { "1": 29, "2": 28, "3": 17, "4": 20, "5": 13, "6": 13 } },
             { "number": 27, "name": "Cõi Trời Tứ Đại Thiên Vương", "moves": { "1": 28, "2": 17, "3": 23, "4": 18, "5": 10, "6": 6 } },
-            { "number": 28, "name": "Cõi Trời Đạo Lợi", "moves": { "1": 29, "2": 17, "3": 20, "4": 22, "5": 11, "6": 7 } },
-            { "number": 29, "name": "Cõi Trời Dạ Ma", "moves": { "1": 30, "2": 31, "3": 17, "4": 23, "5": 12, "6": 10 } },
-            { "number": 30, "name": "Cõi Trời Hỷ Lạc", "moves": { "1": 64, "2": 63, "3": 55, "4": 54, "5": 53, "6": 52 } },
-            { "number": 31, "name": "Cõi Trời Hóa Hiện", "moves": { "1": 52, "2": 30, "3": 43, "4": 32, "5": 22, "6": 12 } },
-            { "number": 32, "name": "Cõi Trời Tha Hóa Tự tại", "moves": { "1": 30, "2": 35, "3": 28, "4": 18, "5": 10 } },
+            { "number": 28, "name": "Cõi Trời Đạo Lợi", "moves": { "1": 29, "2": 17, "3": 20, "4": 22, "5": 11, "6": 7 }, "skipTurns": 2 },
+            { "number": 29, "name": "Cõi Trời Dạ Ma", "moves": { "1": 30, "2": 31, "3": 17, "4": 23, "5": 12, "6": 10 }, "skipTurns": 3 },
+            { "number": 30, "name": "Cõi Trời Hỷ Lạc", "moves": { "1": 64, "2": 63, "3": 55, "4": 54, "5": 53, "6": 52 }, "skipTurns": 3 },
+            { "number": 31, "name": "Cõi Trời Hóa Hiện", "moves": { "1": 52, "2": 30, "3": 43, "4": 32, "5": 22, "6": 12 }, "skipTurns": 3 },
+            { "number": 32, "name": "Cõi Trời Tha Hóa Tự tại", "moves": { "1": 30, "2": 35, "3": 28, "4": 18, "5": 10 }, "skipTurns": 3 },
             { "number": 33, "name": "Tantra, Tiểu Tích lũy", "moves": { "1": 41, "2": 42, "5": 16, "6": 1 } },
             { "number": 34, "name": "Đại Hắc Thiên", "moves": { "1": 61, "2": 81, "3": 70 } },
             { "number": 35, "name": "Cõi Sắc Giới", "moves": { "1": 37, "2": 52, "3": 36, "4": 30, "5": 17, "6": 27 } },
@@ -593,10 +608,11 @@ const app = initializeApp(firebaseConfig);
         let loadingScreenEl, authOverlayEl, entryScreenEl, playerNameInputEl,
             joinGameBtnEl, entryErrorEl, gameWrapperEl, playerListAreaEl, 
             controlPanelEl, playerTurnDisplayEl, rollDiceBtnEl, leaveGameBtnEl,
-            diceResultDisplayEl, diceCubeEl, meritPointsDisplayEl, meritPointsInputEl,
-            specialDiceBtnEl, updateMeritBtnEl, panelToggleButtonEl, movePlayerBtnEl, movePositionInputEl, skipTurnBtnEl,
-            adminPanelEl, adminGameControlBtnEl,
-            notificationModalEl, notificationIconEl, notificationTitleEl, notificationMessageEl, closeNotificationBtnEl, notificationResultEl;
+            diceResultDisplayEl, diceCubeEl,
+            specialDiceBtnEl, panelToggleButtonEl, skipTurnBtnEl,
+            adminPanelEl, adminGameControlBtnEl, adminMovePlayerBtnEl, adminUpdateMeritBtnEl,
+            adminPlayerNameInputEl, adminPositionInputEl, adminMeritPlayerNameInputEl, adminMeritPointsInputEl,
+            notificationModalEl, notificationTitleEl, notificationMessageEl, closeNotificationBtnEl, notificationResultEl;
             
         // --- Utility Functions ---
         function showScreen(screenElement) {
@@ -645,12 +661,12 @@ const app = initializeApp(firebaseConfig);
             }
             
             switch (roll) {
-                case 1: return `Bởi 10 thiện nghiệp bạn đã tích từ nhiều kiếp, Cuối đời Cực thiện nghiệp trổ quả! Một nhân duyên hy hữu đã đưa bạn từ ${oldSquare.name} thẳng đến cảnh giới an lành ${newSquare.name}.`;
+                case 1: return `Cực thiện nghiệp trổ quả! Một nhân duyên hy hữu đã đưa bạn từ ${oldSquare.name} thẳng đến cảnh giới an lành ${newSquare.name}.`;
                 case 2: return `Thiện nghiệp to lớn từ quá khứ đã chín muồi, giúp bạn thoát khỏi ${oldSquare.name} và tái sinh về ${newSquare.name}.`;
                 case 3: return `Nghiệp thiện ác cân bằng, duyên nghiệp đã đưa bạn từ ${oldSquare.name} đến với một kiếp sống mới tại ${newSquare.name}.`;
-                case 4: return `Các ác nghiệp trong kiếp sống ở ${oldSquare.name} đã dẫn dắt bạn đến với ${newSquare.name}.`;
-                case 5: return `Ác nghiệp nặng nề từ ${oldSquare.name} đã hiển hiện, Lúc vào lâm trung Cận tử Nghiệp kéo bạn đến với cảnh giới ${newSquare.name}.`;
-                case 6: return `1 trong 10 Cực ác nghiệp gieo nhiều kiếp đã chín muồi! Nghiệp lực sâu dày từ ${oldSquare.name} Lúc vào lâm trung Cận tử Nghiệp đã đẩy bạn đọa vào ${newSquare.name}.`;
+                case 4: return `Một vài chướng ngại nhỏ từ ác nghiệp trong kiếp sống ở ${oldSquare.name} đã dẫn dắt bạn đến với ${newSquare.name}.`;
+                case 5: return `Ác nghiệp nặng nề từ ${oldSquare.name} đã hiển hiện, kéo bạn đến với cảnh giới ${newSquare.name}.`;
+                case 6: return `Cực ác nghiệp đã chín muồi! Nghiệp lực sâu dày từ ${oldSquare.name} đã đẩy bạn đọa vào ${newSquare.name}.`;
             }
             return `Từ ${oldSquare.name}, nghiệp duyên đã dẫn dắt bạn đến với kiếp sống mới tại ${newSquare.name}.`;
         }
@@ -697,12 +713,12 @@ const app = initializeApp(firebaseConfig);
                                 hostUid: currentUserId, lastActivity: serverTimestamp(),
                             });
                         } else {
-                            throw new Error("Trò chơi chưa được khởi tạo bởi Mara (Vua cõi trời Tha Hóa Tự Tại).");
+                            throw new Error("Trò chơi chưa được khởi tạo bởi Admin.");
                         }
                     } else {
                         const roomData = roomDoc.data();
                         if (roomData.status === 'waiting' && !isCurrentUserAdmin) {
-                            throw new Error("Trò chơi chưa bắt đầu. Vui lòng chờ Mara (Vua cõi trời Tha Hóa Tự Tại).");
+                            throw new Error("Trò chơi chưa bắt đầu. Vui lòng chờ Admin.");
                         }
                         if (roomData.players.find(p => p.uid === currentUserId)) {
                             return; 
@@ -790,7 +806,7 @@ const app = initializeApp(firebaseConfig);
                 } else {
                     localGameState = {};
                     if (!isCurrentUserAdmin) {
-                        alert("Trò chơi đã kết thúc bởi MARA.");
+                        alert("Trò chơi đã kết thúc bởi Admin.");
                     }
                     showScreen(entryScreenEl);
                 }
@@ -805,10 +821,15 @@ const app = initializeApp(firebaseConfig);
 
             playerListAreaEl.innerHTML = ''; 
             
-            roomData.players.forEach((player, index) => {
+            const playersToDisplay = isCurrentUserAdmin
+                ? roomData.players
+                : roomData.players.filter(p => p.uid === currentUserId);
+
+            playersToDisplay.forEach(player => {
+                const originalIndex = roomData.players.findIndex(p => p.uid === player.uid);
                 const playerCard = document.createElement('div');
                 playerCard.className = 'player-card';
-                if (index === roomData.currentPlayerIndex && roomData.status === 'playing') {
+                if (originalIndex === roomData.currentPlayerIndex && roomData.status === 'playing') {
                     playerCard.classList.add('current-turn-highlight');
                 }
 
@@ -830,6 +851,8 @@ const app = initializeApp(firebaseConfig);
 
                 const kickButtonHTML = isCurrentUserAdmin && !player.isAdmin ? 
                     `<button class="kick-btn" data-uid="${player.uid}">Kick</button>` : '';
+                
+                const meritClass = (player.meritPoints || 0) < 0 ? 'negative-merit' : '';
 
                 playerCard.innerHTML = `
                     <div class="player-card-header">
@@ -837,10 +860,10 @@ const app = initializeApp(firebaseConfig);
                             <span class="player-icon">${player.icon}</span>
                             <div class="player-name-pos">
                                 <span class="player-position-text">${currentPos}. ${squareName}</span>
-                                <span class="player-name">${player.name} ${player.isAdmin ? ' (MARA)' : ''}</span>
+                                <span class="player-name">${player.name} ${player.isAdmin ? ' (Admin)' : ''}</span>
                             </div>
                         </div>
-                        <div class="player-merit">
+                        <div class="player-merit ${meritClass}">
                             ${player.meritPoints || 0} Công đức ${kickButtonHTML}
                         </div>
                     </div>
@@ -877,12 +900,6 @@ const app = initializeApp(firebaseConfig);
                  rollDiceBtnEl.disabled = true;
                  skipTurnBtnEl.disabled = true;
             }
-
-            if (clientPlayer) {
-                meritPointsDisplayEl.textContent = clientPlayer.meritPoints || 0;
-            }
-
-            diceResultDisplayEl.textContent = roomData.lastDiceRoll || '?';
 
             if (isCurrentUserAdmin) {
                 adminPanelEl.classList.remove('hidden');
@@ -1023,27 +1040,33 @@ const app = initializeApp(firebaseConfig);
             }
         }
 
-        async function handleUpdateMeritClick() {
-            if (!localGameState || !localGameState.players) return;
+        async function handleAdminUpdateMerit() {
+            if (!isCurrentUserAdmin || !localGameState || !localGameState.players) return;
             
-            const action = document.querySelector('input[name="meritAction"]:checked').value;
-            const points = parseInt(meritPointsInputEl.value);
-            if (isNaN(points) || points <= 0) return;
+            const playerName = adminMeritPlayerNameInputEl.value.trim();
+            const action = document.querySelector('input[name="adminMeritAction"]:checked').value;
+            const points = parseInt(adminMeritPointsInputEl.value);
 
-            updateMeritBtnEl.disabled = true;
+            if (!playerName || isNaN(points) || points <= 0) {
+                alert("Vui lòng nhập tên người chơi và số công đức hợp lệ.");
+                return;
+            }
+
+            adminUpdateMeritBtnEl.disabled = true;
 
             let newPlayersArray = JSON.parse(JSON.stringify(localGameState.players)); 
-            let playerToUpdate = newPlayersArray.find(p => p.uid === currentUserId);
+            let playerToUpdate = newPlayersArray.find(p => p.name.toLowerCase() === playerName.toLowerCase());
             
             if(playerToUpdate) {
                 const currentMerit = playerToUpdate.meritPoints || 0;
                 if (action === 'increase') {
                     playerToUpdate.meritPoints = currentMerit + points;
                 } else if (action === 'decrease') {
-                    playerToUpdate.meritPoints = Math.max(0, currentMerit - points);
+                    playerToUpdate.meritPoints = currentMerit - points;
                 }
             } else {
-                updateMeritBtnEl.disabled = false;
+                alert(`Không tìm thấy người chơi "${playerName}".`);
+                adminUpdateMeritBtnEl.disabled = false;
                 return;
             }
 
@@ -1057,7 +1080,7 @@ const app = initializeApp(firebaseConfig);
             } catch (error) {
                 console.error("Error updating merit points:", error);
             } finally {
-                updateMeritBtnEl.disabled = false;
+                adminUpdateMeritBtnEl.disabled = false;
             }
         }
 
@@ -1092,26 +1115,29 @@ const app = initializeApp(firebaseConfig);
             }
         }
 
-        async function handleMovePlayerClick() {
-            if (!localGameState || !localGameState.players) return;
+        async function handleAdminMovePlayer() {
+            if (!isCurrentUserAdmin || !localGameState || !localGameState.players) return;
             
-            const newPosition = parseInt(movePositionInputEl.value);
-            if (isNaN(newPosition) || newPosition < 1 || newPosition > 104) {
-                alert("Vui lòng nhập vị trí hợp lệ (1-104).");
+            const playerName = adminPlayerNameInputEl.value.trim();
+            const newPosition = parseInt(adminPositionInputEl.value);
+
+            if (!playerName || isNaN(newPosition) || newPosition < 1 || newPosition > 104) {
+                alert("Vui lòng nhập tên và vị trí hợp lệ (1-104).");
                 return;
             }
 
-            movePlayerBtnEl.disabled = true;
+            adminMovePlayerBtnEl.disabled = true;
 
             let newPlayersArray = JSON.parse(JSON.stringify(localGameState.players)); 
-            let playerToUpdate = newPlayersArray.find(p => p.uid === currentUserId);
+            let playerToUpdate = newPlayersArray.find(p => p.name.toLowerCase() === playerName.toLowerCase());
 
             if (playerToUpdate) {
                 playerToUpdate.position = newPosition;
                 if (!playerToUpdate.realmHistory) playerToUpdate.realmHistory = [];
                 playerToUpdate.realmHistory.push({ pos: newPosition, type: 'manual' });
             } else {
-                movePlayerBtnEl.disabled = false;
+                alert(`Không tìm thấy người chơi "${playerName}".`);
+                adminMovePlayerBtnEl.disabled = false;
                 return;
             }
 
@@ -1125,7 +1151,7 @@ const app = initializeApp(firebaseConfig);
             } catch (error) {
                 console.error("Error moving player:", error);
             } finally {
-                movePlayerBtnEl.disabled = false;
+                adminMovePlayerBtnEl.disabled = false;
             }
         }
 
@@ -1182,22 +1208,25 @@ const app = initializeApp(firebaseConfig);
             leaveGameBtnEl = document.getElementById('leaveGameBtn');
             diceResultDisplayEl = document.getElementById('diceResultDisplay');
             diceCubeEl = document.getElementById('diceCube');
-            meritPointsDisplayEl = document.getElementById('meritPointsDisplay');
-            meritPointsInputEl = document.getElementById('meritPointsInput');
             specialDiceBtnEl = document.getElementById('specialDiceBtn');
-            updateMeritBtnEl = document.getElementById('updateMeritBtn');
             panelToggleButtonEl = document.getElementById('panelToggleButton');
-            movePlayerBtnEl = document.getElementById('movePlayerBtn');
-            movePositionInputEl = document.getElementById('movePositionInput');
             skipTurnBtnEl = document.getElementById('skipTurnBtn');
             adminPanelEl = document.getElementById('adminPanel');
             adminGameControlBtnEl = document.getElementById('adminGameControlBtn');
             notificationModalEl = document.getElementById('notificationModal');
-            notificationIconEl = document.getElementById('notificationIcon');
             notificationTitleEl = document.getElementById('notificationTitle');
             notificationResultEl = document.getElementById('notificationResult');
             notificationMessageEl = document.getElementById('notificationMessage');
             closeNotificationBtnEl = document.getElementById('closeNotificationBtn');
+            
+            // Admin-specific DOM elements
+            adminMovePlayerBtnEl = document.getElementById('adminMovePlayerBtn');
+            adminUpdateMeritBtnEl = document.getElementById('adminUpdateMeritBtn');
+            adminPlayerNameInputEl = document.getElementById('adminPlayerNameInput');
+            adminPositionInputEl = document.getElementById('adminPositionInput');
+            adminMeritPlayerNameInputEl = document.getElementById('adminMeritPlayerNameInput');
+            adminMeritPointsInputEl = document.getElementById('adminMeritPointsInput');
+
 
             if (!firebaseConfig || !firebaseConfig.apiKey || firebaseConfig.apiKey === "YOUR_API_KEY") {
                 document.body.innerHTML = '<div style="padding: 20px; text-align: center; font-size: 1.2rem;"><h1>Lỗi Cấu hình</h1><p>Bạn chưa cung cấp cấu hình Firebase. Vui lòng chỉnh sửa mã nguồn, dán cấu hình của bạn vào biến `firebaseConfig` và thử lại.</p></div>';
@@ -1235,9 +1264,9 @@ const app = initializeApp(firebaseConfig);
             if(rollDiceBtnEl) rollDiceBtnEl.addEventListener('click', handleRollDiceClick);
             if(skipTurnBtnEl) skipTurnBtnEl.addEventListener('click', handleSkipTurnClick);
             if(specialDiceBtnEl) specialDiceBtnEl.addEventListener('click', handleSpecialDiceClick);
-            if(updateMeritBtnEl) updateMeritBtnEl.addEventListener('click', handleUpdateMeritClick);
             if(leaveGameBtnEl) leaveGameBtnEl.addEventListener('click', leaveGame);
-            if(movePlayerBtnEl) movePlayerBtnEl.addEventListener('click', handleMovePlayerClick);
+            if(adminMovePlayerBtnEl) adminMovePlayerBtnEl.addEventListener('click', handleAdminMovePlayer);
+            if(adminUpdateMeritBtnEl) adminUpdateMeritBtnEl.addEventListener('click', handleAdminUpdateMerit);
             if(adminGameControlBtnEl) adminGameControlBtnEl.addEventListener('click', handleAdminGameControlClick);
             if(panelToggleButtonEl) panelToggleButtonEl.addEventListener('click', () => {
                 controlPanelEl.classList.toggle('collapsed');
