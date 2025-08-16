@@ -796,12 +796,12 @@ const app = initializeApp(firebaseConfig);
                                 challengeState: { isActive: false }
                             });
                         } else {
-                            throw new Error("Trò chơi chưa được khởi tạo bởi Admin.");
+                            throw new Error("Trò chơi chưa được khởi tạo bởi MARA.");
                         }
                     } else {
                         const roomData = roomDoc.data();
                         if (roomData.status === 'waiting' && !isCurrentUserAdmin) {
-                            throw new Error("Trò chơi chưa bắt đầu. Vui lòng chờ Admin.");
+                            throw new Error("Trò chơi chưa bắt đầu. Vui lòng chờ MARA.");
                         }
                         if (roomData.players.find(p => p.uid === currentUserId)) return;
                         if (roomData.players.length >= MAX_PLAYERS) throw new Error("Phòng đã đầy.");
@@ -933,7 +933,7 @@ const app = initializeApp(firebaseConfig);
                             <span class="player-icon">${player.icon}</span>
                             <div class="player-name-pos">
                                 <span class="player-position-text">${currentPos}. ${squareName}</span>
-                                <span class="player-name">${player.name} ${player.isAdmin ? ' (Admin)' : ''}</span>
+                                <span class="player-name">${player.name} ${player.isAdmin ? ' (MARA)' : ''}</span>
                             </div>
                         </div>
                         <div class="player-merit ${meritClass}">
