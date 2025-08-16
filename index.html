@@ -166,7 +166,7 @@
             border-radius: 50%;
             line-height: 1;
         }
-        .special-roll { background-color: #ffcdd2; color: #c62828; border-color: #ef9a9a; }
+        .challenge-roll, .special-roll { background-color: #ffcdd2; color: #c62828; border-color: #ef9a9a; }
         .prayer-roll { background-color: #d1c4e9; color: #4527a0; border-color: #b39ddb; }
         .manual-move { background-color: #ffcdd2; color: #c62828; border-color: #ef9a9a; }
         .good-roll { background-color: #c8e6c9; color: #2e7d32; border-color: #a5d6a7; }
@@ -227,7 +227,7 @@
         .face.top    { transform: rotateX(90deg) translateZ(25px); } .face.bottom { transform: rotateX(-90deg) translateZ(25px); }
 
         @keyframes spin {
-            0% { transform: rotateX(0deg) rotateY(0deg); }
+            0% { transform: rotateX(0deg); }
             100% { transform: rotateX(720deg) rotateY(1080deg); }
         }
 
@@ -328,23 +328,24 @@
             font-size: 0.9rem;
             font-style: italic;
             color: #6d4c41;
+            text-align: left;
         }
         #summaryTableContainer {
             max-height: 60vh;
             overflow-y: auto;
             margin-top: 1rem;
         }
-        #summaryTable {
+        #summaryTable, #summaryMatrix {
             width: 100%;
             border-collapse: collapse;
             font-size: 0.9rem;
         }
-        #summaryTable th, #summaryTable td {
+        #summaryTable th, #summaryTable td, #summaryMatrix th, #summaryMatrix td {
             border: 1px solid #d7c8a0;
             padding: 8px;
             text-align: left;
         }
-        #summaryTable th {
+        #summaryTable th, #summaryMatrix th {
             background-color: #d7c8a0;
             color: #5d4037;
             position: sticky;
@@ -353,6 +354,16 @@
         #summaryTable .top-1 { background-color: #FFD700; /* Gold */ }
         #summaryTable .top-2 { background-color: #C0C0C0; /* Silver */ }
         #summaryTable .top-3 { background-color: #CD7F32; /* Bronze */ }
+        #summaryMatrix {
+            margin-top: 10px;
+        }
+        #summaryMatrix td {
+            text-align: center;
+        }
+        #summaryMatrix td:first-child {
+            text-align: left;
+            font-weight: bold;
+        }
 
 
         /* Mobile-first Control Panel */
@@ -490,7 +501,7 @@
         <div class="overlay-content">
             <h2 id="notificationTitle" class="text-2xl font-bold"></h2>
             <p id="notificationResult"></p>
-            <p id="notificationMessage"></p>
+            <div id="notificationMessage"></div>
             <button id="closeNotificationBtn" class="mt-4">Đã hiểu</button>
         </div>
     </div>
@@ -670,6 +681,40 @@ const app = initializeApp(firebaseConfig);
             summaryModalEl, summaryTableContainerEl, endGameConfirmBtnEl,
             challengeBtnEl, requestSalvationBtnEl, practicePrayBtnEl, salvationBtnEl;
             
+        // --- Narrative Content ---
+        const challengeNarratives = {
+            twoPlayers: {
+                positive: [
+                    "Trong một tiền kiếp, <b>{winnerName}</b> đã là người mẹ hiền, tần tảo nuôi nấng <b>{loserName}</b> (người con) khôn lớn. Nhờ tình yêu thương và sự dạy dỗ đúng đắn, người con đã trở thành một vị quan thanh liêm, mang lại phúc lộc cho dân chúng, tạo nên phước báu cho cả hai.",
+                    "Duyên nghiệp đưa đẩy, <b>{winnerName}</b> từng là người cha nghiêm khắc nhưng hết mực thương con, đã rèn giũa <b>{loserName}</b> nên người. Người con sau này đã xuất gia tu hành, đạt được thành tựu, và hồi hướng công đức cho cha mẹ, giúp cả hai cùng tăng trưởng phước báu.",
+                    "Trong một kiếp sống nơi sơn lâm, <b>{winnerName}</b> là một vị thầy thuốc tài ba, đã cứu mạng và nhận nuôi <b>{loserName}</b> mồ côi. Cả hai đã cùng nhau bốc thuốc cứu người, tích lũy vô lượng công đức, khiến kiếp sống đó trở nên thật ý nghĩa."
+                ],
+                negative: [
+                    "Nghiệp duyên trớ trêu, <b>{p1Name}</b> và <b>{p2Name}</b> từng là hai huynh đệ trong một băng cướp. Họ đã cùng nhau cướp bóc, sát hại vô số người vô tội và phải gánh chịu quả báo nặng nề.",
+                    "Trong một kiếp sống chốn quan trường, <b>{p1Name}</b> là một tham quan, đã xúi giục và bao che cho <b>{p2Name}</b> (thuộc hạ) làm nhiều điều sai trái, vơ vét của công, ức hiếp dân lành. Ác nghiệp này đã khiến phước báu của cả hai bị tổn hại nghiêm trọng.",
+                    "<b>{p1Name}</b> và <b>{p2Name}</b> từng là hai kẻ buôn bán gian dối. Họ đã lừa gạt khách hàng, bán hàng giả, hàng kém chất lượng để trục lợi. Nhân quả không sai lệch, hành vi bất chính đã làm tiêu tan công đức của họ.",
+                    "Trong một gia đình quyền quý, <b>{p1Name}</b> và <b>{p2Name}</b> là hai anh em nhưng lòng đầy đố kỵ. Họ đã tranh giành tài sản, hãm hại lẫn nhau, gây ra cảnh huynh đệ tương tàn, khiến gia đình tan nát và tự làm tổn hại phước báu của chính mình.",
+                    "Dưới danh nghĩa tu hành, <b>{p1Name}</b> và <b>{p2Name}</b> đã lừa gạt tín đồ, bóp méo giáo pháp để mưu cầu danh lợi. Tội lỗi phá hoại Chánh pháp này đã khiến họ mất đi một phần lớn công đức đã tích lũy.",
+                    "<b>{p1Name}</b> và <b>{p2Name}</b> từng là những kẻ săn bắn tàn nhẫn. Họ đã sát hại vô số sinh mạng trong rừng sâu chỉ để mua vui và kiếm lợi. Ác nghiệp sát sinh này đã khiến họ phải chịu quả báo mất đi công đức."
+                ],
+                tie: [
+                    "Thật là một duyên lành, trong một kiếp quá khứ, <b>{player1Name}</b> và <b>{player2Name}</b> đã là đôi vợ chồng son sắt, cùng nhau xây dựng một gia đình hạnh phúc. Họ chung tay làm việc thiện, nuôi dạy con cái hiếu thảo, và sống bên nhau đến đầu bạc răng long.",
+                    "Nhân duyên vợ chồng đã gắn kết <b>{player1Name}</b> và <b>{player2Name}</b> trong một kiếp sống an lạc. Họ là một cặp đôi thương nhân giàu có nhưng lòng đầy nhân ái, thường xuyên mở kho lương thực cứu giúp người nghèo, nhờ đó mà tài sản và phước báu ngày càng tăng trưởng.",
+                    "Trong một kiếp làm nghệ nhân, <b>{player1Name}</b> và <b>{player2Name}</b> là một cặp vợ chồng tâm đầu ý hợp. Họ cùng nhau tạo ra những tác phẩm nghệ thuật tuyệt đẹp, mang lại niềm vui và sự an ủi cho mọi người, sống một cuộc đời thanh cao, không màng danh lợi."
+                ],
+                neutral: [
+                    "Trong dòng chảy luân hồi, <b>{player1Name}</b> và <b>{player2Name}</b> chỉ là hai người khách qua đường, vô tình gặp nhau trong một quán trọ. Họ trò chuyện vài câu rồi lại mỗi người một ngả, duyên nợ chỉ thoáng qua như một cơn gió.",
+                    "<b>{player1Name}</b> từng là một người lái đò, đã một lần đưa <b>{player2Name}</b> qua sông. Chuyến đò kết thúc, duyên phận cũng chỉ dừng lại ở đó. Cuộc đời họ không còn liên quan gì đến nhau nữa, nợ nần ân oán đều không có.",
+                    "Tại một phiên chợ đông đúc, <b>{player1Name}</b> đã mua một món hàng từ <b>{player2Name}</b>. Cuộc trao đổi sòng phẳng kết thúc, mối duyên giữa họ cũng chỉ có vậy, không thiện không ác, không nợ không ơn."
+                ]
+            },
+            multiPlayer: [
+                "Một gia đình hạnh phúc đã được tái hiện! Trong đó, {roleAssignments}. Gia đình này sống rất hòa thuận, trên kính dưới nhường. Họ cùng nhau làm ăn phát đạt và thường xuyên giúp đỡ người khó khăn, xây chùa, đúc tượng. Nhờ vậy, tất cả thành viên đều tích lũy được công đức lớn.",
+                "Nghiệp chướng đã trói buộc những người này vào một gia đình! Trong đó, {roleAssignments}. Gia đình này luôn lục đục, cha mẹ thì tham lam, con cái thì ngỗ ngược. Họ kinh doanh bất chính, hãm hại đối thủ, khiến nhiều người oán hận. Quả báo là tất cả đều bị tổn hao phước đức.",
+                "Một gia đình với nhiều duyên nợ phức tạp! Trong đó, {roleAssignments}. Cha mẹ ({parentNames}) là người lương thiện, chăm chỉ làm ăn. Tuy nhiên, những người con ({childrenNames}) lại ham chơi, phá phách, gây ra nhiều nghiệp xấu. Cha mẹ vì quá yêu thương mà che giấu tội lỗi cho con, cuối cùng cả gia đình đều bị ảnh hưởng, người được người mất, công đức không thể vẹn toàn."
+            ]
+        };
+        
         // --- Utility Functions ---
         function showScreen(screenElement) {
             [loadingScreenEl, authOverlayEl, entryScreenEl, gameWrapperEl, summaryModalEl].forEach(el => {if(el) el.style.display = 'none'});
@@ -749,8 +794,8 @@ const app = initializeApp(firebaseConfig);
 
         function showNotification(title, resultText, message) {
             notificationTitleEl.textContent = title;
-            notificationResultEl.textContent = resultText;
-            notificationMessageEl.textContent = message;
+            notificationResultEl.innerHTML = resultText;
+            notificationMessageEl.innerHTML = message; // Use innerHTML to render bold tags
             notificationModalEl.style.display = 'flex';
         }
 
@@ -783,8 +828,15 @@ const app = initializeApp(firebaseConfig);
                         meritSpentOnSalvation: 0,
                         turnsInHell: 0,
                         visitsToJambudvipa: 0,
-                        totalMoves: 0
+                        totalMoves: 0,
+                        relationships: {}
                     };
+
+                    if (isCurrentUserAdmin) {
+                        newPlayer.position = 32;
+                        newPlayer.meritPoints = 999;
+                        newPlayer.realmHistory = [{pos: 32, type: 'start', skip: 0}];
+                    }
                     
                     if (!roomDoc.exists()) {
                         if (isCurrentUserAdmin) {
@@ -793,7 +845,8 @@ const app = initializeApp(firebaseConfig);
                                 roomId: SINGLE_ROOM_ID, players: [newPlayer], currentPlayerIndex: 0,
                                 status: "waiting", lastDiceRoll: null, createdAt: serverTimestamp(),
                                 hostUid: currentUserId, lastActivity: serverTimestamp(), roundCount: 0,
-                                challengeState: { isActive: false }
+                                challengeState: { isActive: false },
+                                challengeInitiatedThisTurn: false
                             });
                         } else {
                             throw new Error("Trò chơi chưa được khởi tạo bởi MARA.");
@@ -858,6 +911,11 @@ const app = initializeApp(firebaseConfig);
                     const oldGameState = localGameState;
                     localGameState = docSnap.data();
                     
+                    const clientPlayer = localGameState.players.find(p => p.uid === currentUserId);
+                    if (clientPlayer) {
+                        isCurrentUserAdmin = clientPlayer.isAdmin;
+                    }
+
                     if (localGameState.status === 'finished' && oldGameState.status !== 'finished') {
                         calculateAndShowSummary(localGameState.players);
                     } else if(gameWrapperEl.style.display !== 'none') {
@@ -865,7 +923,6 @@ const app = initializeApp(firebaseConfig);
                         updateControlPanelUI(localGameState);
                         
                         // Check for new notifications
-                        const clientPlayer = localGameState.players.find(p => p.uid === currentUserId);
                         if (clientPlayer && clientPlayer.notifications && clientPlayer.notifications.length > 0) {
                             setTimeout(() => {
                                 clientPlayer.notifications.forEach(notif => {
@@ -905,12 +962,12 @@ const app = initializeApp(firebaseConfig);
                 const originalIndex = roomData.players.findIndex(p => p.uid === player.uid);
                 const playerCard = document.createElement('div');
                 playerCard.className = 'player-card';
-                if (originalIndex === roomData.currentPlayerIndex && roomData.status === 'playing') {
+                if (originalIndex === roomData.currentPlayerIndex && roomData.status === 'playing' && !(roomData.challengeState && roomData.challengeState.isActive)) {
                     playerCard.classList.add('current-turn-highlight');
                 }
 
                 const diceHistoryHTML = (player.diceRollHistory || []).map(rollData => 
-                    `<div class="roll-item ${rollData.isGoodRoll ? 'good-roll' : ''} ${rollData.type === 'special' ? 'special-roll' : ''} ${rollData.type === 'prayer' ? 'prayer-roll' : ''}">${rollData.value}</div>`
+                    `<div class="roll-item ${rollData.type === 'challenge' ? 'challenge-roll' : ''} ${rollData.isGoodRoll ? 'good-roll' : ''} ${rollData.type === 'special' ? 'special-roll' : ''} ${rollData.type === 'prayer' ? 'prayer-roll' : ''}">${rollData.value}</div>`
                 ).join('');
                 
                 const realmHistoryHTML = (player.realmHistory || []).map(realmData => {
@@ -926,6 +983,8 @@ const app = initializeApp(firebaseConfig);
                 const squareName = squareData ? squareData.name : "Không xác định";
                 const kickButtonHTML = isCurrentUserAdmin && !player.isAdmin ? `<button class="kick-btn" data-uid="${player.uid}">Kick</button>` : '';
                 const meritClass = (player.meritPoints || 0) < 0 ? 'negative-merit' : '';
+                
+                const descriptionHTML = isCurrentUserAdmin ? '' : `<div class="realm-description">${getSquareDescription(currentPos)}</div>`;
 
                 playerCard.innerHTML = `
                     <div class="player-card-header">
@@ -940,9 +999,7 @@ const app = initializeApp(firebaseConfig);
                             ${player.meritPoints || 0} Công đức ${kickButtonHTML}
                         </div>
                     </div>
-                    <div class="realm-description">
-                       ${getSquareDescription(currentPos)}
-                    </div>
+                    ${descriptionHTML}
                     <div class="history-label">Lịch sử Cảnh giới:</div>
                     <div class="history-rolls">${realmHistoryHTML}</div>
                     <div class="history-label">Lịch sử Gieo:</div>
@@ -956,103 +1013,111 @@ const app = initializeApp(firebaseConfig);
         
         function updateControlPanelUI(roomData) {
             if (!playerTurnDisplayEl || !rollDiceBtnEl || !diceResultDisplayEl || !roomData || !roomData.players) return;
-
-            const currentPlayer = roomData.players[roomData.currentPlayerIndex];
             const clientPlayer = roomData.players.find(p => p.uid === currentUserId);
             if (!clientPlayer) return;
 
-            const isMyTurn = currentPlayer && currentPlayer.uid === currentUserId && roomData.status === 'playing';
+            const defaultChallengeState = {
+                isActive: false, realmPosition: null, requiredParticipants: [],
+                participants: [], participantsWhoRolled: [], rolls: {}
+            };
+            const challengeState = Object.assign({}, defaultChallengeState, roomData.challengeState);
 
-            playerTurnDisplayEl.textContent = currentPlayer ? `Lượt của: ${currentPlayer.name} ${currentPlayer.icon}` : 'Chờ...';
-            
-            // Admin-specific controls
-            if (isCurrentUserAdmin) {
-                rollDiceBtnEl.classList.add('hidden');
-                skipTurnBtnEl.classList.remove('hidden');
-                skipTurnBtnEl.disabled = !isMyTurn;
-                skipTurnInfoEl.classList.add('hidden');
-            } else {
-                // Regular player controls
-                if (clientPlayer.skipTurnsRemaining > 0) {
-                    skipTurnInfoEl.classList.remove('hidden');
-                    skipTurnInfoEl.textContent = `Còn ${clientPlayer.skipTurnsRemaining} kiếp bị giam giữ.`;
-                    rollDiceBtnEl.classList.add('hidden');
-                    skipTurnBtnEl.classList.remove('hidden');
-                    skipTurnBtnEl.disabled = !isMyTurn;
-                } else {
-                    skipTurnInfoEl.classList.add('hidden');
-                    rollDiceBtnEl.classList.remove('hidden');
-                    skipTurnBtnEl.classList.add('hidden');
-                    rollDiceBtnEl.disabled = !isMyTurn;
-                }
-            }
-
-            // Hide all action buttons by default
-            [requestSalvationBtnEl, practicePrayBtnEl, salvationBtnEl, challengeBtnEl].forEach(btn => btn.classList.add('hidden'));
-            
-            // Salvation Logic
-            const clientRealm = getRealmCategory(clientPlayer.position);
-            if (clientRealm === 'hell' && clientPlayer.skipTurnsRemaining > 0) {
-                requestSalvationBtnEl.classList.remove('hidden');
-                if (clientPlayer.hasRequestedSalvation) {
-                    requestSalvationBtnEl.disabled = true;
-                    requestSalvationBtnEl.textContent = 'Đang chờ cứu độ...';
-                } else {
-                    requestSalvationBtnEl.disabled = false;
-                    requestSalvationBtnEl.textContent = 'Thỉnh cầu Cứu độ';
-                }
-            }
-            const isSomeoneRequestingSalvation = roomData.players.some(p => p.hasRequestedSalvation);
-            const canClientSave = ['deva', 'mahayana', 'vajrayana'].includes(clientRealm) || (clientRealm === 'human' && clientPlayer.meritPoints >= 5);
-            if (isSomeoneRequestingSalvation && canClientSave) {
-                salvationBtnEl.classList.remove('hidden');
-                salvationBtnEl.textContent = 'Cứu độ Chúng sinh';
-            }
-
-            // Practice & Pray Logic
-            const practiceRealms = ['human', 'preta', 'animal', 'nonbuddhist'];
-            if (isMyTurn && practiceRealms.includes(clientRealm) && clientPlayer.position !== 24) {
-                practicePrayBtnEl.classList.remove('hidden');
-                 if (clientPlayer.hasRequestedPractice) {
-                    practicePrayBtnEl.disabled = true;
-                    practicePrayBtnEl.textContent = 'Đã thỉnh cầu...';
-                } else {
-                    practicePrayBtnEl.disabled = false;
-                    practicePrayBtnEl.textContent = 'Thực hành & Cầu nguyện';
-                }
-            }
-            const isSomeoneRequestingPractice = roomData.players.some(p => p.hasRequestedPractice);
-            const canClientHelpPractice = ['deva', 'mahayana', 'vajrayana', 'hinayana', 'pureland'].includes(clientRealm) && clientPlayer.meritPoints >= 5;
-            if (isSomeoneRequestingPractice && canClientHelpPractice) {
-                salvationBtnEl.classList.remove('hidden');
-                salvationBtnEl.textContent = 'Cứu độ';
-            }
-
-            // Challenge Logic
-            const challengeState = roomData.challengeState || { isActive: false };
-            const challengeRealms = ['human', 'preta', 'animal', 'deva'];
-            const playersInSameRealm = roomData.players.filter(p => p.position === clientPlayer.position && challengeRealms.includes(getRealmCategory(p.position)));
-            
-            if (challengeState.isActive && challengeState.requiredParticipants.includes(clientPlayer.uid)) {
-                challengeBtnEl.classList.remove('hidden');
-                const hasAccepted = challengeState.participants.includes(clientPlayer.uid);
-                challengeBtnEl.disabled = hasAccepted;
-                challengeBtnEl.textContent = hasAccepted ? 'Đang chờ...' : 'Chấp nhận Challenge';
-            } else if (isMyTurn && isCurrentUserAdmin && roomData.roundCount > 0 && playersInSameRealm.length > 1) {
-                challengeBtnEl.classList.remove('hidden');
-                challengeBtnEl.disabled = false;
-                challengeBtnEl.textContent = 'Challenge';
-            } else {
-                challengeBtnEl.classList.add('hidden');
-            }
-
-
-            // Admin Panel
             if (isCurrentUserAdmin) {
                 adminPanelEl.classList.remove('hidden');
                 adminGameControlBtnEl.textContent = roomData.status === 'playing' ? 'Kết thúc Trò chơi' : 'Bắt đầu Trò chơi';
             } else {
                 adminPanelEl.classList.add('hidden');
+            }
+
+            if (challengeState.isActive) {
+                playerTurnDisplayEl.textContent = `Challenge tại ${boardSquaresMap.get(challengeState.realmPosition)?.name || '...'}`;
+                const amIRequired = challengeState.requiredParticipants.includes(clientPlayer.uid);
+                const amIParticipant = challengeState.participants.includes(clientPlayer.uid);
+                const allRequiredHaveJoined = challengeState.requiredParticipants.every(uid => challengeState.participants.includes(uid));
+
+                rollDiceBtnEl.classList.add('hidden');
+                skipTurnBtnEl.classList.add('hidden');
+                challengeBtnEl.classList.add('hidden');
+                [requestSalvationBtnEl, practicePrayBtnEl, salvationBtnEl].forEach(btn => btn.classList.add('hidden'));
+
+                if (!allRequiredHaveJoined) {
+                    if (amIRequired) {
+                        challengeBtnEl.classList.remove('hidden');
+                        challengeBtnEl.textContent = amIParticipant ? 'Đang chờ đối thủ...' : 'Chấp nhận Challenge';
+                        challengeBtnEl.disabled = amIParticipant;
+                    }
+                } else {
+                    if (amIParticipant) {
+                        rollDiceBtnEl.classList.remove('hidden');
+                        const haveIRolled = challengeState.participantsWhoRolled.includes(clientPlayer.uid);
+                        rollDiceBtnEl.textContent = haveIRolled ? 'Đã gieo' : 'Gieo Challenge';
+                        rollDiceBtnEl.disabled = haveIRolled;
+                    }
+                }
+            } else {
+                const currentPlayer = roomData.players[roomData.currentPlayerIndex];
+                const isMyTurn = currentPlayer && currentPlayer.uid === currentUserId && roomData.status === 'playing';
+
+                playerTurnDisplayEl.textContent = currentPlayer ? `Lượt của: ${currentPlayer.name} ${currentPlayer.icon}` : 'Chờ...';
+                
+                if (isCurrentUserAdmin) {
+                    rollDiceBtnEl.classList.add('hidden');
+                    skipTurnBtnEl.classList.remove('hidden');
+                    skipTurnBtnEl.disabled = !isMyTurn;
+                    skipTurnInfoEl.classList.add('hidden');
+                } else {
+                    if (clientPlayer.skipTurnsRemaining > 0) {
+                        skipTurnInfoEl.classList.remove('hidden');
+                        skipTurnInfoEl.textContent = `Còn ${clientPlayer.skipTurnsRemaining} kiếp bị giam giữ.`;
+                        rollDiceBtnEl.classList.add('hidden');
+                        skipTurnBtnEl.classList.remove('hidden');
+                        skipTurnBtnEl.disabled = !isMyTurn;
+                    } else {
+                        skipTurnInfoEl.classList.add('hidden');
+                        rollDiceBtnEl.classList.remove('hidden');
+                        skipTurnBtnEl.classList.add('hidden');
+                        rollDiceBtnEl.disabled = !isMyTurn;
+                        rollDiceBtnEl.textContent = 'Vô Thường đến..';
+                    }
+                }
+
+                [requestSalvationBtnEl, practicePrayBtnEl, salvationBtnEl, challengeBtnEl].forEach(btn => btn.classList.add('hidden'));
+                const clientRealm = getRealmCategory(clientPlayer.position);
+
+                if (clientRealm === 'hell' && clientPlayer.skipTurnsRemaining > 0) {
+                    requestSalvationBtnEl.classList.remove('hidden');
+                    requestSalvationBtnEl.disabled = clientPlayer.hasRequestedSalvation;
+                    requestSalvationBtnEl.textContent = clientPlayer.hasRequestedSalvation ? 'Đang chờ cứu độ...' : 'Thỉnh cầu Cứu độ';
+                }
+
+                const isSomeoneRequestingSalvation = roomData.players.some(p => p.hasRequestedSalvation);
+                const canClientSave = ['deva', 'mahayana', 'vajrayana'].includes(clientRealm) || (clientRealm === 'human' && clientPlayer.meritPoints >= 5);
+                if (isSomeoneRequestingSalvation && canClientSave) {
+                    salvationBtnEl.classList.remove('hidden');
+                    salvationBtnEl.textContent = 'Cứu độ Chúng sinh';
+                }
+
+                const practiceRealms = ['human', 'preta', 'animal', 'nonbuddhist'];
+                if (isMyTurn && practiceRealms.includes(clientRealm) && clientPlayer.position !== 24) {
+                    practicePrayBtnEl.classList.remove('hidden');
+                    practicePrayBtnEl.disabled = clientPlayer.hasRequestedPractice;
+                    practicePrayBtnEl.textContent = clientPlayer.hasRequestedPractice ? 'Đã thỉnh cầu...' : 'Thực hành & Cầu nguyện';
+                }
+
+                const isSomeoneRequestingPractice = roomData.players.some(p => p.hasRequestedPractice);
+                const canClientHelpPractice = ['deva', 'mahayana', 'vajrayana', 'hinayana', 'pureland'].includes(clientRealm) && clientPlayer.meritPoints >= 5;
+                if (isSomeoneRequestingPractice && canClientHelpPractice) {
+                    salvationBtnEl.classList.remove('hidden');
+                    salvationBtnEl.textContent = 'Cứu độ';
+                }
+
+                const challengeRealms = ['human', 'preta', 'animal', 'deva'];
+                const playersInSameRealm = roomData.players.filter(p => !p.isAdmin && p.position === clientPlayer.position && challengeRealms.includes(getRealmCategory(p.position)));
+                if (isMyTurn && roomData.roundCount > 0 && playersInSameRealm.length > 1 && !roomData.challengeInitiatedThisTurn) {
+                    challengeBtnEl.classList.remove('hidden');
+                    challengeBtnEl.disabled = false;
+                    challengeBtnEl.textContent = 'Challenge';
+                }
             }
         }
 
@@ -1063,7 +1128,6 @@ const app = initializeApp(firebaseConfig);
             let notification = { title: 'Kết quả Gieo', result: '', message: '' };
             
             if(playerToUpdate) {
-                // Reset request flags at the start of the move processing
                 playerToUpdate.hasRequestedSalvation = false;
                 playerToUpdate.hasRequestedPractice = false;
 
@@ -1085,7 +1149,7 @@ const app = initializeApp(firebaseConfig);
                     playerToUpdate.diceRollHistory.push({ value: roll, type: 'normal', isGoodRoll: isGoodRoll });
                 }
 
-                let nextSquareNumber = oldPosition; // Default to staying in the same place
+                let nextSquareNumber = oldPosition;
                 if (oldSquare && oldSquare.moves && oldSquare.moves[roll.toString()] !== undefined) {
                     nextSquareNumber = oldSquare.moves[roll.toString()];
                 }
@@ -1100,7 +1164,10 @@ const app = initializeApp(firebaseConfig);
                         playerToUpdate.visitsToJambudvipa = (playerToUpdate.visitsToJambudvipa || 0) + 1;
                     }
 
-                    const skipTurns = newSquare.skipTurns || 0;
+                    let skipTurns = 0;
+                    if (newSquare) {
+                        skipTurns = newSquare.skipTurns || 0;
+                    }
                     playerToUpdate.skipTurnsRemaining = skipTurns;
                     playerToUpdate.realmHistory.push({ pos: nextSquareNumber, type: 'normal', skip: skipTurns });
                     
@@ -1118,7 +1185,7 @@ const app = initializeApp(firebaseConfig);
                 }
                 notification.message = notification.message || generateKarmaSummary(oldSquare, newSquare, roll);
             }
-
+            
             let nextPlayerIndex = (localGameState.currentPlayerIndex + 1) % newPlayersArray.length;
             let newRoundCount = localGameState.roundCount || 0;
             if (nextPlayerIndex === 0) newRoundCount++;
@@ -1131,7 +1198,8 @@ const app = initializeApp(firebaseConfig);
                     currentPlayerIndex: nextPlayerIndex,
                     lastDiceRoll: roll,
                     lastActivity: serverTimestamp(),
-                    roundCount: newRoundCount
+                    roundCount: newRoundCount,
+                    challengeInitiatedThisTurn: false
                 });
                 showNotification(notification.title, notification.result, notification.message);
             } catch (error) {
@@ -1141,6 +1209,12 @@ const app = initializeApp(firebaseConfig);
         }
 
         async function handleRollDiceClick() {
+            const challengeState = localGameState.challengeState || { isActive: false };
+            if (challengeState.isActive) {
+                await handleChallengeRoll();
+                return;
+            }
+
             const currentPlayer = localGameState.players[localGameState.currentPlayerIndex];
             if (!localGameState || !localGameState.players || localGameState.status !== "playing" || !currentPlayer || currentPlayer.uid !== currentUserId) return;
             
@@ -1187,7 +1261,6 @@ const app = initializeApp(firebaseConfig);
                     const players = roomData.players;
                     const playerToUpdate = players[currentPlayerIndex];
                     
-                    // Reset request flags at the end of the turn
                     playerToUpdate.hasRequestedSalvation = false;
                     playerToUpdate.hasRequestedPractice = false;
 
@@ -1202,7 +1275,8 @@ const app = initializeApp(firebaseConfig);
                     transaction.update(roomRef, {
                         players: players,
                         currentPlayerIndex: nextPlayerIndex,
-                        lastActivity: serverTimestamp()
+                        lastActivity: serverTimestamp(),
+                        challengeInitiatedThisTurn: false
                     });
                 });
             } catch (error) {
@@ -1305,84 +1379,197 @@ const app = initializeApp(firebaseConfig);
                 if (!roomDoc.exists()) return;
                 const roomData = roomDoc.data();
                 const challengeState = roomData.challengeState || { isActive: false };
-                const clientPlayer = roomData.players.find(p => p.uid === currentUserId);
+                let players = roomData.players;
+                const clientPlayer = players.find(p => p.uid === currentUserId);
 
-                if (isCurrentUserAdmin && !challengeState.isActive) {
+                if (!challengeState.isActive) {
                     const challengeRealms = ['human', 'preta', 'animal', 'deva'];
                     const currentRealm = getRealmCategory(clientPlayer.position);
                     if (!challengeRealms.includes(currentRealm)) return;
                     
-                    const requiredParticipants = roomData.players
-                        .filter(p => p.position === clientPlayer.position)
+                    const requiredParticipants = players
+                        .filter(p => p.position === clientPlayer.position && !p.isAdmin)
                         .map(p => p.uid);
 
                     if (requiredParticipants.length < 2) return;
-
+                    
                     const newChallengeState = {
                         isActive: true,
                         initiator: currentUserId,
                         realmPosition: clientPlayer.position,
                         participants: [currentUserId],
                         requiredParticipants: requiredParticipants,
-                        rolls: {}
+                        rolls: {},
+                        participantsWhoRolled: []
                     };
-                    transaction.update(roomRef, { challengeState: newChallengeState });
+                    transaction.update(roomRef, { challengeState: newChallengeState, challengeInitiatedThisTurn: true });
 
                 } else if (challengeState.isActive && challengeState.requiredParticipants.includes(currentUserId)) {
                     const hasAccepted = challengeState.participants.includes(currentUserId);
                     if (hasAccepted) return;
 
                     challengeState.participants.push(currentUserId);
-
-                    if (challengeState.participants.length === challengeState.requiredParticipants.length) {
-                        // All accepted, execute challenge
-                        let totalRoll = 0;
-                        challengeState.requiredParticipants.forEach(uid => {
-                            const roll = Math.floor(Math.random() * 6) + 1;
-                            challengeState.rolls[uid] = roll;
-                            totalRoll += roll;
-                        });
-
-                        const numParticipants = challengeState.requiredParticipants.length;
-                        const averageTarget = 3.5 * numParticipants;
-                        const points = numParticipants >= 4 ? 4 : (numParticipants === 3 ? 3 : 2);
-                        
-                        let meritChange = 0;
-                        let outcomeMessage = "";
-
-                        if (totalRoll < averageTarget) {
-                            meritChange = points;
-                            outcomeMessage = `Cộng nghiệp thiện đã trổ quả! Mọi người nhận được ${points} công đức.`;
-                        } else if (totalRoll > averageTarget) {
-                            meritChange = -points;
-                            outcomeMessage = `Cộng nghiệp ác đã trổ quả! Mọi người bị trừ ${points} công đức.`;
-                        } else {
-                            outcomeMessage = "Cộng nghiệp trung tính, không có gì thay đổi.";
-                        }
-                        
-                        const updatedPlayers = roomData.players.map(p => {
-                            if (challengeState.requiredParticipants.includes(p.uid)) {
-                                p.meritPoints += meritChange;
-                                p.notifications.push({
-                                    title: "Kết quả Challenge",
-                                    result: `Tổng điểm gieo: ${totalRoll}`,
-                                    message: outcomeMessage
-                                });
-                            }
-                            return p;
-                        });
-                        
-                        transaction.update(roomRef, { 
-                            players: updatedPlayers,
-                            challengeState: { isActive: false }
-                        });
-
-                    } else {
-                        // Still waiting for others
-                        transaction.update(roomRef, { challengeState: challengeState });
-                    }
+                    transaction.update(roomRef, { challengeState: challengeState });
                 }
             });
+        }
+        
+        async function handleChallengeRoll() {
+            rollDiceBtnEl.disabled = true;
+            const roll = Math.floor(Math.random() * 6) + 1;
+
+            diceResultDisplayEl.style.display = 'none';
+            diceCubeEl.classList.add('is-rolling');
+
+            setTimeout(async () => {
+                diceCubeEl.classList.remove('is-rolling');
+                diceResultDisplayEl.textContent = roll;
+                diceResultDisplayEl.style.display = 'flex';
+
+                const roomPath = `${ROOM_COLLECTION_NAME}/${SINGLE_ROOM_ID}`;
+                const roomRef = doc(db, roomPath);
+
+                try {
+                    await runTransaction(db, async (transaction) => {
+                        const roomDoc = await transaction.get(roomRef);
+                        if (!roomDoc.exists()) throw new Error("Room not found");
+                        let roomData = roomDoc.data();
+                        let challengeState = roomData.challengeState;
+                        let players = roomData.players;
+
+                        if (!challengeState || !challengeState.isActive) return;
+
+                        challengeState.rolls[currentUserId] = roll;
+                        if (!challengeState.participantsWhoRolled.includes(currentUserId)) {
+                            challengeState.participantsWhoRolled.push(currentUserId);
+                        }
+                        
+                        let playerToUpdate = players.find(p => p.uid === currentUserId);
+                        if (playerToUpdate) {
+                            playerToUpdate.diceRollHistory.push({ value: roll, type: 'challenge' });
+                        }
+
+                        const allParticipants = challengeState.participants;
+                        const allHaveRolled = allParticipants.every(uid => challengeState.participantsWhoRolled.includes(uid));
+
+                        if (allHaveRolled) {
+                            const numParticipants = allParticipants.length;
+                            const rolls = allParticipants.map(uid => challengeState.rolls[uid]);
+                            const totalRollScore = rolls.reduce((sum, r) => sum + r, 0);
+                            const targetScore = numParticipants * 3;
+
+                            let meritChange = 0;
+                            let overallOutcome = 'neutral';
+
+                            if (totalRollScore > targetScore) {
+                                overallOutcome = 'positive';
+                                if (numParticipants === 2) meritChange = 2;
+                                else if (numParticipants === 3) meritChange = 3;
+                                else meritChange = 5;
+                            } else if (totalRollScore < targetScore) {
+                                overallOutcome = 'negative';
+                                if (numParticipants === 2) meritChange = -2;
+                                else if (numParticipants === 3) meritChange = -3;
+                                else meritChange = -5;
+                            }
+                            
+                            const resultsForNarrative = allParticipants.map(uid => ({
+                                uid,
+                                name: players.find(p => p.uid === uid).name,
+                                roll: challengeState.rolls[uid]
+                            }));
+
+                            const narrative = generateChallengeNarrative(resultsForNarrative, overallOutcome);
+                            let resultSummary = `Tổng điểm gieo là <b>${totalRollScore}</b>, so với mục tiêu <b>${targetScore}</b>.<br><br>`;
+                            
+                            allParticipants.forEach(uid => {
+                                const player = players.find(p => p.uid === uid);
+                                player.meritPoints += meritChange;
+                                const outcomeText = meritChange > 0 ? `<span class="text-green-600 font-bold">Thắng (+${meritChange} CĐ)</span>` :
+                                                    meritChange < 0 ? `<span class="text-red-600 font-bold">Thua (${meritChange} CĐ)</span>` :
+                                                    '<span>Hòa (0 CĐ)</span>';
+                                resultSummary += `<b>${player.name}</b> gieo được ${challengeState.rolls[uid]}. Kết quả: ${outcomeText}<br>`;
+                            });
+                            
+                            const fullMessage = `<div class="text-left">${resultSummary}<hr class="my-2"><p>${narrative}</p></div>`;
+
+                            allParticipants.forEach(uid => {
+                                players.find(p => p.uid === uid).notifications.push({
+                                    title: "Challenge Kết thúc",
+                                    result: "",
+                                    message: fullMessage
+                                });
+                            });
+                            
+                            roomData.challengeState = { isActive: false };
+                            
+                            // The turn does NOT end here. The initiator continues their turn.
+                            transaction.update(roomRef, {
+                                players: players,
+                                challengeState: roomData.challengeState,
+                                lastActivity: serverTimestamp()
+                            });
+
+                        } else {
+                            transaction.update(roomRef, { players: players, challengeState: challengeState });
+                        }
+                    });
+                } catch (error) {
+                    console.error("Error during challenge roll:", error);
+                    showNotification("Lỗi", "", "Có lỗi xảy ra trong quá trình Challenge.");
+                    rollDiceBtnEl.disabled = false;
+                }
+            }, 1500);
+        }
+
+        function generateChallengeNarrative(results, overallOutcome) {
+            const getRandomItem = (arr) => arr[Math.floor(Math.random() * arr.length)];
+            
+            if (results.length === 2) {
+                const p1 = results[0];
+                const p2 = results[1];
+
+                if (p1.roll === p2.roll) {
+                    let story = getRandomItem(challengeNarratives.twoPlayers.tie);
+                    return story.replace('{player1Name}', `<b>${p1.name}</b>`).replace('{player2Name}', `<b>${p2.name}</b>`);
+                }
+                
+                const winner = p1.roll > p2.roll ? p1 : p2;
+                const loser = p1.roll < p2.roll ? p1 : p2;
+
+                if (overallOutcome === 'positive') {
+                    let story = getRandomItem(challengeNarratives.twoPlayers.positive);
+                    return story.replace('{winnerName}', `<b>${winner.name}</b>`).replace('{loserName}', `<b>${loser.name}</b>`);
+                } else if (overallOutcome === 'negative') {
+                    let story = getRandomItem(challengeNarratives.twoPlayers.negative);
+                    return story.replace('{p1Name}', `<b>${p1.name}</b>`).replace('{p2Name}', `<b>${p2.name}</b>`).replace('{winnerName}', `<b>${winner.name}</b>`).replace('{loserName}', `<b>${loser.name}</b>`);
+                } else { // neutral
+                    let story = getRandomItem(challengeNarratives.twoPlayers.neutral);
+                    return story.replace('{player1Name}', `<b>${p1.name}</b>`).replace('{player2Name}', `<b>${p2.name}</b>`);
+                }
+            } else if (results.length > 2) {
+                results.sort((a, b) => b.roll - a.roll);
+                let story = getRandomItem(challengeNarratives.multiPlayer);
+                
+                let roleAssignments = "";
+                let parentNames = "";
+                let childrenNames = "";
+
+                if (results.length === 3) {
+                    roleAssignments = `<b>${results[0].name}</b> làm cha, <b>${results[1].name}</b> làm mẹ, và <b>${results[2].name}</b> làm con.`;
+                    parentNames = `<b>${results[0].name}</b> & <b>${results[1].name}</b>`;
+                    childrenNames = `<b>${results[2].name}</b>`;
+                } else { // 4+ players
+                    roleAssignments = `<b>${results[0].name}</b> làm cha, <b>${results[1].name}</b> làm mẹ. Những người còn lại là con: ${results.slice(2).map(r => `<b>${r.name}</b>`).join(', ')}.`;
+                    parentNames = `<b>${results[0].name}</b> & <b>${results[1].name}</b>`;
+                    childrenNames = results.slice(2).map(r => `<b>${r.name}</b>`).join(', ');
+                }
+                
+                return story.replace('{roleAssignments}', roleAssignments)
+                            .replace('{parentNames}', parentNames)
+                            .replace('{childrenNames}', childrenNames);
+            }
+            return "Duyên nghiệp thật khó lường, các bạn đã cùng nhau trải qua một kiếp sống không thể nghĩ bàn.";
         }
 
         async function handleAdminUpdateMerit() {
@@ -1417,8 +1604,19 @@ const app = initializeApp(firebaseConfig);
             let newPlayersArray = JSON.parse(JSON.stringify(localGameState.players)); 
             let playerToUpdate = newPlayersArray.find(p => p.name.toLowerCase() === playerName.toLowerCase());
             if (playerToUpdate) {
+                // Clear previous skip turns
+                playerToUpdate.skipTurnsRemaining = 0;
+
+                // Get new square data
+                const newSquare = boardSquaresMap.get(newPosition);
+                const newSkipTurns = newSquare ? (newSquare.skipTurns || 0) : 0;
+
+                // Apply new position and new skip turns
                 playerToUpdate.position = newPosition;
-                playerToUpdate.realmHistory.push({ pos: newPosition, type: 'manual', skip: 0 });
+                playerToUpdate.skipTurnsRemaining = newSkipTurns;
+
+                // Update history correctly
+                playerToUpdate.realmHistory.push({ pos: newPosition, type: 'manual', skip: newSkipTurns });
             } else {
                 alert(`Không tìm thấy người chơi "${playerName}".`);
                 adminMovePlayerBtnEl.disabled = false; return;
@@ -1497,8 +1695,31 @@ const app = initializeApp(firebaseConfig);
                 </tr>`;
             });
             tableHTML += `</tbody></table>`;
+            
+            let matrixHTML = `<h3 class="text-xl font-bold mt-6 mb-2">Ma trận Duyên Nghiệp (Số lần gặp nhau)</h3>
+                      <table id="summaryMatrix"><thead><tr><th>Tên</th>`;
+    
+            nonAdminPlayers.forEach(p => {
+                matrixHTML += `<th>${p.name}</th>`;
+            });
+            matrixHTML += `</tr></thead><tbody>`;
 
-            summaryTableContainerEl.innerHTML = tableHTML;
+            nonAdminPlayers.forEach(p1 => {
+                matrixHTML += `<tr><td><strong>${p1.name}</strong></td>`;
+                nonAdminPlayers.forEach(p2 => {
+                    if (p1.uid === p2.uid) {
+                        matrixHTML += `<td>-</td>`;
+                    } else {
+                        const count = p1.relationships?.[p2.uid] || 0;
+                        matrixHTML += `<td>${count}</td>`;
+                    }
+                });
+                matrixHTML += `</tr>`;
+            });
+
+            matrixHTML += `</tbody></table>`;
+
+            summaryTableContainerEl.innerHTML = tableHTML + matrixHTML;
             summaryModalEl.style.display = 'flex';
         }
 
