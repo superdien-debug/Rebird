@@ -142,6 +142,16 @@
             font-size: 1rem;
             color: #3e2723;
             cursor: help; /* Add cursor for tooltip */
+            position: relative;
+        }
+        .roll-item sup {
+            position: absolute;
+            top: -2px;
+            right: 0px;
+            font-size: 0.7rem;
+            padding: 1px 3px;
+            border-radius: 50%;
+            line-height: 1;
         }
         .special-roll { background-color: #ffcdd2; color: #c62828; border-color: #ef9a9a; }
         .prayer-roll { background-color: #d1c4e9; color: #4527a0; border-color: #b39ddb; }
@@ -239,12 +249,15 @@
         .text-input {
             width: 120px; border: 1px solid #b08d57; border-radius: 5px; padding: 5px;
         }
-        .action-buttons { display: flex; justify-content: center; gap: 10px; }
+        .action-buttons, .player-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
         .action-buttons button, .player-actions button {
             padding: 8px 12px; border-radius: 6px; border: none;
             cursor: pointer; color: white; font-size: 0.9rem;
         }
         #challengeBtn { background-color: #4a90e2; box-shadow: 0 3px #357ABD; }
+        #requestSalvationBtn { background-color: #f59e0b; box-shadow: 0 3px #d97706; }
+        #practicePrayBtn { background-color: #10b981; box-shadow: 0 3px #059669; }
+        #salvationBtn { background-color: #8b5cf6; box-shadow: 0 3px #7c3aed; }
         #leaveGameBtn { background-color: #d32f2f; box-shadow: 0 3px #b71c1c; margin-top: 15px; }
         .kick-btn {
             background-color: #d32f2f; color: white; border: none;
@@ -398,12 +411,12 @@
                 </div>
             </div>
             <div class="main-actions">
-                <button id="rollDiceBtn">Kết thúc 1 Kiếp</button>
+                <button id="rollDiceBtn">Vô Thường</button>
                 <button id="skipTurnBtn">Tiếp Tục Kiếp Sống</button>
             </div>
             
             <div class="player-actions section-divider">
-                 <button id="challengeBtn" disabled>Challenge</button>
+                 <button id="challengeBtn">Challenge</button>
                  <button id="requestSalvationBtn" class="hidden">Thỉnh cầu Cứu độ</button>
                  <button id="practicePrayBtn" class="hidden">Thực hành & Cầu nguyện</button>
                  <button id="salvationBtn" class="hidden">Cứu độ Chúng sinh</button>
@@ -457,14 +470,10 @@
     </div>
     
     <script type="module">
-        // SỬA LỖI: Chỉ import các hàm cần thiết từ đúng URL CDN
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, serverTimestamp, runTransaction, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
-        // --- BƯỚC 1: DÁN CẤU HÌNH FIREBASE CỦA BẠN VÀO ĐÂY ---
-        // Lấy cấu hình này từ Firebase Console của dự án của bạn
-        // (Project Settings -> General -> Your apps -> Web app -> Firebase SDK snippet -> Config)
 const firebaseConfig = {
   apiKey: "AIzaSyAO08-aOuCFzmj8WwbX6MDkDipWtRJ6z_Q",
   authDomain: "maratika-rebird-game.firebaseapp.com",
@@ -475,14 +484,10 @@ const firebaseConfig = {
   measurementId: "G-V70SSVYEXD"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
-        // ---------------------------------------------------------
-
-        // --- Constants and Global State ---
+        
         const SINGLE_ROOM_ID = "maratika_main_rebirth_room";
         const MAX_PLAYERS = 13;
-        // BƯỚC 2: Đổi tên collection nếu bạn muốn có một phòng chơi mới hoàn toàn
         const ROOM_COLLECTION_NAME = "game_room_v2";
         const ADMIN_NAME = "Tsering Gesar";
         
@@ -491,11 +496,11 @@ const app = initializeApp(firebaseConfig);
         let isCurrentUserAdmin = false;
         let currentRoomUnsubscribe = null; 
         let localGameState = {}; 
+        let originalRollForPrayer = null;
 
         const animalIconsGlobal = ['🐅', '🐘', '🐎', '🐉', '🦢', '🐒', '🐢', '🦜', '🐬', '🦌']; 
         
         const squaresData = [
-            // Dữ liệu 104 ô được giữ nguyên như trước
             { "number": 1, "name": "Địa ngục Kim Cương", "moves": {}, "skipTurns": 6 },
             { "number": 2, "name": "Địa ngục Vô Gián", "moves": { "1": 17, "2": 10, "3": 3 }, "skipTurns": 4 },
             { "number": 3, "name": "Địa ngục Nóng", "moves": { "1": 11, "2": 10, "3": 8, "4": 7, "5": 5, "6": 2 }, "skipTurns": 3 },
@@ -608,11 +613,12 @@ const app = initializeApp(firebaseConfig);
         let loadingScreenEl, authOverlayEl, entryScreenEl, playerNameInputEl,
             joinGameBtnEl, entryErrorEl, gameWrapperEl, playerListAreaEl, 
             controlPanelEl, playerTurnDisplayEl, rollDiceBtnEl, leaveGameBtnEl,
-            diceResultDisplayEl, diceCubeEl,
-            specialDiceBtnEl, panelToggleButtonEl, skipTurnBtnEl,
+            diceResultDisplayEl, diceCubeEl, panelToggleButtonEl, skipTurnBtnEl, skipTurnInfoEl,
             adminPanelEl, adminGameControlBtnEl, adminMovePlayerBtnEl, adminUpdateMeritBtnEl,
             adminPlayerNameInputEl, adminPositionInputEl, adminMeritPlayerNameInputEl, adminMeritPointsInputEl,
-            notificationModalEl, notificationTitleEl, notificationMessageEl, closeNotificationBtnEl, notificationResultEl;
+            notificationModalEl, notificationTitleEl, notificationMessageEl, closeNotificationBtnEl, notificationResultEl,
+            prayerModalEl, confirmPrayerBtnEl, cancelPrayerBtnEl,
+            challengeBtnEl, requestSalvationBtnEl, practicePrayBtnEl, salvationBtnEl;
             
         // --- Utility Functions ---
         function showScreen(screenElement) {
@@ -646,20 +652,9 @@ const app = initializeApp(firebaseConfig);
         }
 
         function generateKarmaSummary(oldSquare, newSquare, roll) {
-            const oldCategory = getRealmCategory(oldSquare.number);
-            const newCategory = getRealmCategory(newSquare.number);
-
             if (oldSquare.number === newSquare.number) {
-                 switch (roll) {
-                    case 1: return `Cực thiện nghiệp trổ quả! Dù vẫn ở lại ${oldSquare.name}, tâm bạn đã chuyển hóa, tạo ra phước báu vô lượng cho kiếp sau.`;
-                    case 2: return `Thiện nghiệp to lớn từ quá khứ giúp bạn có một kiếp sống an lành tại ${oldSquare.name}, tiếp tục tích lũy tư lương.`;
-                    case 3: return `Nghiệp thiện ác cân bằng, bạn có một kiếp sống bình thường tại ${oldSquare.name} để tiếp tục quán chiếu.`;
-                    case 4: return `Một vài chướng ngại nhỏ từ ác nghiệp khiến bạn chưa thể thoát khỏi ${oldSquare.name}. Hãy tinh tấn hơn nữa.`;
-                    case 5: return `Ác nghiệp nặng nề đang hiển hiện, trói buộc bạn thêm một kiếp nữa trong cảnh giới ${oldSquare.name}.`;
-                    case 6: return `Cực ác nghiệp đã chín muồi! Nghiệp lực sâu dày tại ${oldSquare.name} khiến bạn khó có thể thoát ra trong kiếp này.`;
-                }
+                 return `Gieo được ${roll}, không có nước đi được định sẵn. Bạn vẫn ở lại ${oldSquare.name}.`;
             }
-            
             switch (roll) {
                 case 1: return `Cực thiện nghiệp trổ quả! Một nhân duyên hy hữu đã đưa bạn từ ${oldSquare.name} thẳng đến cảnh giới an lành ${newSquare.name}.`;
                 case 2: return `Thiện nghiệp to lớn từ quá khứ đã chín muồi, giúp bạn thoát khỏi ${oldSquare.name} và tái sinh về ${newSquare.name}.`;
@@ -670,7 +665,6 @@ const app = initializeApp(firebaseConfig);
             }
             return `Từ ${oldSquare.name}, nghiệp duyên đã dẫn dắt bạn đến với kiếp sống mới tại ${newSquare.name}.`;
         }
-
 
         function showNotification(title, resultText, message) {
             notificationTitleEl.textContent = title;
@@ -683,12 +677,10 @@ const app = initializeApp(firebaseConfig);
         async function joinGame() {
             const playerName = playerNameInputEl.value.trim();
             if (!playerName) {
-                displayError(entryErrorEl, "Vui lòng nhập tên của bạn.");
-                return;
+                displayError(entryErrorEl, "Vui lòng nhập tên của bạn."); return;
             }
             if (!currentUserId) {
-                displayError(entryErrorEl, "Lỗi xác thực người dùng.");
-                return;
+                displayError(entryErrorEl, "Lỗi xác thực người dùng."); return;
             }
 
             isCurrentUserAdmin = playerName.toLowerCase() === ADMIN_NAME.toLowerCase();
@@ -700,17 +692,23 @@ const app = initializeApp(firebaseConfig);
             try {
                 await runTransaction(db, async (transaction) => {
                     const roomDoc = await transaction.get(roomRef);
+                    const newPlayer = {
+                        uid: currentUserId, name: playerName, icon: '...', 
+                        diceRollHistory: [], meritPoints: 0, position: 24, 
+                        realmHistory: [{pos: 24, type: 'start', skip: 0}], 
+                        isAdmin: isCurrentUserAdmin, skipTurnsRemaining: 0,
+                        hasRequestedSalvation: false, hasRequestedPractice: false,
+                        notifications: []
+                    };
                     
                     if (!roomDoc.exists()) {
                         if (isCurrentUserAdmin) {
-                            const newPlayer = {
-                                uid: currentUserId, name: playerName, icon: animalIconsGlobal[0], 
-                                diceRollHistory: [], meritPoints: 0, position: 24, realmHistory: [{pos: 24, type: 'start'}], isAdmin: true
-                            };
+                            newPlayer.icon = animalIconsGlobal[0];
                             transaction.set(roomRef, {
                                 roomId: SINGLE_ROOM_ID, players: [newPlayer], currentPlayerIndex: 0,
                                 status: "waiting", lastDiceRoll: null, createdAt: serverTimestamp(),
-                                hostUid: currentUserId, lastActivity: serverTimestamp(),
+                                hostUid: currentUserId, lastActivity: serverTimestamp(), roundCount: 0,
+                                challengeState: { isActive: false }
                             });
                         } else {
                             throw new Error("Trò chơi chưa được khởi tạo bởi Admin.");
@@ -720,25 +718,16 @@ const app = initializeApp(firebaseConfig);
                         if (roomData.status === 'waiting' && !isCurrentUserAdmin) {
                             throw new Error("Trò chơi chưa bắt đầu. Vui lòng chờ Admin.");
                         }
-                        if (roomData.players.find(p => p.uid === currentUserId)) {
-                            return; 
-                        }
-                        if (roomData.players.length >= MAX_PLAYERS) {
-                            throw new Error("Phòng đã đầy.");
-                        }
-                        const newPlayer = {
-                            uid: currentUserId, name: playerName, 
-                            icon: animalIconsGlobal[roomData.players.length % animalIconsGlobal.length],
-                            diceRollHistory: [], meritPoints: 0, position: 24, realmHistory: [{pos: 24, type: 'start'}], isAdmin: isCurrentUserAdmin
-                        };
+                        if (roomData.players.find(p => p.uid === currentUserId)) return;
+                        if (roomData.players.length >= MAX_PLAYERS) throw new Error("Phòng đã đầy.");
+                        
+                        newPlayer.icon = animalIconsGlobal[roomData.players.length % animalIconsGlobal.length];
                         const updatedPlayers = [...roomData.players, newPlayer];
                         transaction.update(roomRef, { players: updatedPlayers });
                     }
                 });
-
                 subscribeToRoomUpdates(SINGLE_ROOM_ID);
                 showScreen(gameWrapperEl);
-
             } catch (error) {
                 displayError(entryErrorEl, "Lỗi vào phòng: " + error.message);
                 joinGameBtnEl.disabled = false;
@@ -747,45 +736,29 @@ const app = initializeApp(firebaseConfig);
 
         async function leaveGame() {
             if (!currentUserId) return;
-            
             const roomPath = `${ROOM_COLLECTION_NAME}/${SINGLE_ROOM_ID}`;
             const roomRef = doc(db, roomPath);
-
             try {
                 await runTransaction(db, async (transaction) => {
                     const roomDoc = await transaction.get(roomRef);
                     if (!roomDoc.exists()) return;
-
                     const roomData = roomDoc.data();
                     const leavingPlayerIndex = roomData.players.findIndex(p => p.uid === currentUserId);
                     if (leavingPlayerIndex === -1) return;
-
                     const updatedPlayers = roomData.players.filter(p => p.uid !== currentUserId);
-
-                    if (updatedPlayers.length === 0 || (updatedPlayers.length > 0 && roomData.hostUid === currentUserId)) {
+                    if (updatedPlayers.length === 0 || roomData.hostUid === currentUserId) {
                         transaction.delete(roomRef);
                     } else {
                         let newCurrentPlayerIndex = roomData.currentPlayerIndex;
-                        
-                        if (leavingPlayerIndex < newCurrentPlayerIndex) {
-                            newCurrentPlayerIndex--;
-                        } else if (leavingPlayerIndex === newCurrentPlayerIndex) {
-                            newCurrentPlayerIndex = leavingPlayerIndex % updatedPlayers.length;
-                        }
-
-                        transaction.update(roomRef, { 
-                            players: updatedPlayers,
-                            currentPlayerIndex: newCurrentPlayerIndex,
-                        });
+                        if (leavingPlayerIndex < newCurrentPlayerIndex) newCurrentPlayerIndex--;
+                        else if (leavingPlayerIndex === newCurrentPlayerIndex) newCurrentPlayerIndex = leavingPlayerIndex % updatedPlayers.length;
+                        transaction.update(roomRef, { players: updatedPlayers, currentPlayerIndex: newCurrentPlayerIndex });
                     }
                 });
-                if (currentRoomUnsubscribe) {
-                    currentRoomUnsubscribe();
-                    currentRoomUnsubscribe = null;
-                }
+                if (currentRoomUnsubscribe) currentRoomUnsubscribe();
+                currentRoomUnsubscribe = null;
                 showScreen(entryScreenEl);
                 if(joinGameBtnEl) joinGameBtnEl.disabled = false;
-
             } catch (error) {
                 console.error("Error leaving game:", error);
             }
@@ -795,19 +768,37 @@ const app = initializeApp(firebaseConfig);
             if (currentRoomUnsubscribe) currentRoomUnsubscribe();
             const roomPath = `${ROOM_COLLECTION_NAME}/${roomId}`;
             const roomRef = doc(db, roomPath);
-
             currentRoomUnsubscribe = onSnapshot(roomRef, (docSnap) => {
                 if (docSnap.exists()) {
+                    const oldGameState = localGameState;
                     localGameState = docSnap.data();
+                    
                     if(gameWrapperEl.style.display !== 'none') {
                         updatePlayerListUI(localGameState);
                         updateControlPanelUI(localGameState);
+                        
+                        // Check for new notifications
+                        const clientPlayer = localGameState.players.find(p => p.uid === currentUserId);
+                        if (clientPlayer && clientPlayer.notifications && clientPlayer.notifications.length > 0) {
+                            setTimeout(() => {
+                                clientPlayer.notifications.forEach(notif => {
+                                    showNotification(notif.title, notif.result, notif.message);
+                                });
+                                // Clear notifications in Firestore
+                                const roomRef = doc(db, `${ROOM_COLLECTION_NAME}/${SINGLE_ROOM_ID}`);
+                                const updatedPlayers = localGameState.players.map(p => {
+                                    if (p.uid === currentUserId) {
+                                        return { ...p, notifications: [] };
+                                    }
+                                    return p;
+                                });
+                                updateDoc(roomRef, { players: updatedPlayers });
+                            }, 100); 
+                        }
                     }
                 } else {
                     localGameState = {};
-                    if (!isCurrentUserAdmin) {
-                        alert("Trò chơi đã kết thúc bởi Admin.");
-                    }
+                    if (!isCurrentUserAdmin) alert("Trò chơi đã kết thúc bởi Admin.");
                     showScreen(entryScreenEl);
                 }
             }, (error) => {
@@ -818,12 +809,8 @@ const app = initializeApp(firebaseConfig);
         
         function updatePlayerListUI(roomData) {
             if (!playerListAreaEl || !roomData || !roomData.players) return;
-
             playerListAreaEl.innerHTML = ''; 
-            
-            const playersToDisplay = isCurrentUserAdmin
-                ? roomData.players
-                : roomData.players.filter(p => p.uid === currentUserId);
+            const playersToDisplay = isCurrentUserAdmin ? roomData.players : roomData.players.filter(p => p.uid === currentUserId);
 
             playersToDisplay.forEach(player => {
                 const originalIndex = roomData.players.findIndex(p => p.uid === player.uid);
@@ -834,24 +821,21 @@ const app = initializeApp(firebaseConfig);
                 }
 
                 const diceHistoryHTML = (player.diceRollHistory || []).map(rollData => 
-                    `<div class="roll-item ${rollData.isGoodRoll ? 'good-roll' : ''} ${rollData.type === 'special' ? 'special-roll' : ''}">${rollData.value}</div>`
+                    `<div class="roll-item ${rollData.isGoodRoll ? 'good-roll' : ''} ${rollData.type === 'special' ? 'special-roll' : ''} ${rollData.type === 'prayer' ? 'prayer-roll' : ''}">${rollData.value}</div>`
                 ).join('');
                 
                 const realmHistoryHTML = (player.realmHistory || []).map(realmData => {
                     const realmCategory = getRealmCategory(realmData.pos);
-                    const isPureLand = realmCategory === 'pureland';
                     const squareInfo = boardSquaresMap.get(realmData.pos);
                     const title = squareInfo ? `${realmData.pos}. ${squareInfo.name}` : `Ô ${realmData.pos}`;
-                    return `<div class="roll-item realm-${realmCategory} ${realmData.type === 'manual' ? 'manual-move' : ''}" title="${title}">${realmData.pos}${isPureLand ? '🪷' : ''}</div>`;
+                    const skipText = realmData.skip > 0 ? `<sup class="text-red-500 font-bold">-${realmData.skip}</sup>` : '';
+                    return `<div class="roll-item realm-${realmCategory} ${realmData.type === 'manual' ? 'manual-move' : ''}" title="${title}">${realmData.pos}${skipText}</div>`;
                 }).join('');
 
                 const currentPos = player.position || 24;
                 const squareData = boardSquaresMap.get(currentPos);
                 const squareName = squareData ? squareData.name : "Không xác định";
-
-                const kickButtonHTML = isCurrentUserAdmin && !player.isAdmin ? 
-                    `<button class="kick-btn" data-uid="${player.uid}">Kick</button>` : '';
-                
+                const kickButtonHTML = isCurrentUserAdmin && !player.isAdmin ? `<button class="kick-btn" data-uid="${player.uid}">Kick</button>` : '';
                 const meritClass = (player.meritPoints || 0) < 0 ? 'negative-merit' : '';
 
                 playerCard.innerHTML = `
@@ -875,13 +859,7 @@ const app = initializeApp(firebaseConfig);
                 playerListAreaEl.appendChild(playerCard);
             });
 
-             // Add event listeners for new kick buttons
-            document.querySelectorAll('.kick-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    const uidToKick = e.target.dataset.uid;
-                    handleKickPlayerClick(uidToKick);
-                });
-            });
+            document.querySelectorAll('.kick-btn').forEach(btn => btn.addEventListener('click', (e) => handleKickPlayerClick(e.target.dataset.uid)));
         }
         
         function updateControlPanelUI(roomData) {
@@ -889,295 +867,483 @@ const app = initializeApp(firebaseConfig);
 
             const currentPlayer = roomData.players[roomData.currentPlayerIndex];
             const clientPlayer = roomData.players.find(p => p.uid === currentUserId);
+            if (!clientPlayer) return;
 
-            if (currentPlayer) {
-                playerTurnDisplayEl.textContent = `Lượt của: ${currentPlayer.name} ${currentPlayer.icon}`;
-                const isMyTurn = currentPlayer.uid === currentUserId;
-                rollDiceBtnEl.disabled = !isMyTurn;
+            const isMyTurn = currentPlayer && currentPlayer.uid === currentUserId && roomData.status === 'playing';
+
+            playerTurnDisplayEl.textContent = currentPlayer ? `Lượt của: ${currentPlayer.name} ${currentPlayer.icon}` : 'Chờ...';
+            
+            // Admin-specific controls
+            if (isCurrentUserAdmin) {
+                rollDiceBtnEl.classList.add('hidden');
+                skipTurnBtnEl.classList.remove('hidden');
                 skipTurnBtnEl.disabled = !isMyTurn;
+                skipTurnInfoEl.classList.add('hidden');
             } else {
-                 playerTurnDisplayEl.textContent = 'Chờ...';
-                 rollDiceBtnEl.disabled = true;
-                 skipTurnBtnEl.disabled = true;
+                // Regular player controls
+                if (clientPlayer.skipTurnsRemaining > 0) {
+                    skipTurnInfoEl.classList.remove('hidden');
+                    skipTurnInfoEl.textContent = `Còn ${clientPlayer.skipTurnsRemaining} kiếp bị giam giữ.`;
+                    rollDiceBtnEl.classList.add('hidden');
+                    skipTurnBtnEl.classList.remove('hidden');
+                    skipTurnBtnEl.disabled = !isMyTurn;
+                } else {
+                    skipTurnInfoEl.classList.add('hidden');
+                    rollDiceBtnEl.classList.remove('hidden');
+                    skipTurnBtnEl.classList.add('hidden');
+                    rollDiceBtnEl.disabled = !isMyTurn;
+                }
             }
 
+            // Hide all action buttons by default
+            [requestSalvationBtnEl, practicePrayBtnEl, salvationBtnEl, challengeBtnEl].forEach(btn => btn.classList.add('hidden'));
+            
+            // Salvation Logic
+            const clientRealm = getRealmCategory(clientPlayer.position);
+            if (clientRealm === 'hell' && clientPlayer.skipTurnsRemaining > 0) {
+                requestSalvationBtnEl.classList.remove('hidden');
+                if (clientPlayer.hasRequestedSalvation) {
+                    requestSalvationBtnEl.disabled = true;
+                    requestSalvationBtnEl.textContent = 'Đang chờ cứu độ...';
+                } else {
+                    requestSalvationBtnEl.disabled = false;
+                    requestSalvationBtnEl.textContent = 'Thỉnh cầu Cứu độ';
+                }
+            }
+            const isSomeoneRequestingSalvation = roomData.players.some(p => p.hasRequestedSalvation);
+            const canClientSave = ['deva', 'mahayana', 'vajrayana'].includes(clientRealm) || (clientRealm === 'human' && clientPlayer.meritPoints >= 5);
+            if (isSomeoneRequestingSalvation && canClientSave) {
+                salvationBtnEl.classList.remove('hidden');
+                salvationBtnEl.textContent = 'Cứu độ Chúng sinh';
+            }
+
+            // Practice & Pray Logic
+            const practiceRealms = ['human', 'preta', 'animal', 'nonbuddhist'];
+            if (isMyTurn && practiceRealms.includes(clientRealm) && clientPlayer.position !== 24) {
+                practicePrayBtnEl.classList.remove('hidden');
+                 if (clientPlayer.hasRequestedPractice) {
+                    practicePrayBtnEl.disabled = true;
+                    practicePrayBtnEl.textContent = 'Đã thỉnh cầu...';
+                } else {
+                    practicePrayBtnEl.disabled = false;
+                    practicePrayBtnEl.textContent = 'Thực hành & Cầu nguyện';
+                }
+            }
+            const isSomeoneRequestingPractice = roomData.players.some(p => p.hasRequestedPractice);
+            const canClientHelpPractice = ['deva', 'mahayana', 'vajrayana', 'hinayana', 'pureland'].includes(clientRealm) && clientPlayer.meritPoints >= 5;
+            if (isSomeoneRequestingPractice && canClientHelpPractice) {
+                salvationBtnEl.classList.remove('hidden');
+                salvationBtnEl.textContent = 'Cứu độ';
+            }
+
+            // Challenge Logic
+            const challengeState = roomData.challengeState || { isActive: false };
+            const challengeRealms = ['human', 'preta', 'animal', 'deva'];
+            const playersInSameRealm = roomData.players.filter(p => p.position === clientPlayer.position && challengeRealms.includes(getRealmCategory(p.position)));
+            
+            if (challengeState.isActive && challengeState.requiredParticipants.includes(clientPlayer.uid)) {
+                challengeBtnEl.classList.remove('hidden');
+                const hasAccepted = challengeState.participants.includes(clientPlayer.uid);
+                challengeBtnEl.disabled = hasAccepted;
+                challengeBtnEl.textContent = hasAccepted ? 'Đang chờ...' : 'Chấp nhận Challenge';
+            } else if (isMyTurn && isCurrentUserAdmin && roomData.roundCount > 0 && playersInSameRealm.length > 1) {
+                challengeBtnEl.classList.remove('hidden');
+                challengeBtnEl.disabled = false;
+                challengeBtnEl.textContent = 'Challenge';
+            } else {
+                challengeBtnEl.classList.add('hidden');
+            }
+
+
+            // Admin Panel
             if (isCurrentUserAdmin) {
                 adminPanelEl.classList.remove('hidden');
-                if (roomData.status === 'playing') {
-                    adminGameControlBtnEl.textContent = 'Kết thúc Trò chơi';
-                } else {
-                    adminGameControlBtnEl.textContent = 'Bắt đầu Trò chơi';
-                }
+                adminGameControlBtnEl.textContent = roomData.status === 'playing' ? 'Kết thúc Trò chơi' : 'Bắt đầu Trò chơi';
             } else {
                 adminPanelEl.classList.add('hidden');
             }
         }
 
-        async function handleRollDiceClick() {
-            if (!localGameState || !localGameState.players || localGameState.status !== "playing") return;
-
-            const currentPlayer = localGameState.players[localGameState.currentPlayerIndex];
-            if (!currentPlayer || currentPlayer.uid !== currentUserId) return;
+        async function proceedWithMove(roll, isPrayerRoll) {
+            let newPlayersArray = JSON.parse(JSON.stringify(localGameState.players)); 
+            let playerToUpdate = newPlayersArray.find(p => p.uid === currentUserId);
+            let isGoodRoll = false;
+            let notification = { title: 'Kết quả Gieo', result: '', message: '' };
             
-            rollDiceBtnEl.disabled = true;
-            skipTurnBtnEl.disabled = true;
+            if(playerToUpdate) {
+                // Reset request flags at the start of the move processing
+                playerToUpdate.hasRequestedSalvation = false;
+                playerToUpdate.hasRequestedPractice = false;
 
-            const roll = Math.floor(Math.random() * 6) + 1;
-            
-            if (diceCubeEl && diceResultDisplayEl) {
-                diceResultDisplayEl.style.display = 'none';
-                diceCubeEl.classList.add('is-rolling');
-            }
-
-            setTimeout(async () => {
-                if (diceCubeEl && diceResultDisplayEl) {
-                    diceCubeEl.classList.remove('is-rolling');
-                    diceResultDisplayEl.textContent = roll;
-                    diceResultDisplayEl.style.display = 'flex';
-                }
-
-                let newPlayersArray = JSON.parse(JSON.stringify(localGameState.players)); 
-                let playerToUpdate = newPlayersArray.find(p => p.uid === currentUserId);
-                let isGoodRoll = false;
-                let notification = { title: 'Kết quả Gieo', result: '', message: '' };
+                const oldPosition = playerToUpdate.position || 24;
+                const oldSquare = boardSquaresMap.get(oldPosition);
                 
-                if(playerToUpdate) {
-                    if (!playerToUpdate.diceRollHistory) playerToUpdate.diceRollHistory = [];
-                    if (!playerToUpdate.realmHistory) playerToUpdate.realmHistory = [];
-                    
-                    const oldPosition = playerToUpdate.position || 24;
-                    const oldSquare = boardSquaresMap.get(oldPosition);
-                    const oldRealmCategory = getRealmCategory(oldPosition);
-
-                    // Merit point rules for staying in a realm
-                    if (['mahayana', 'vajrayana'].includes(oldRealmCategory)) {
-                        playerToUpdate.meritPoints = (playerToUpdate.meritPoints || 0) + 1;
-                    } else if ([26, 62, 65, 67, 68, 69, 72].includes(oldPosition)) { // Trì minh vương & Chuyển luân vương
-                        playerToUpdate.meritPoints = (playerToUpdate.meritPoints || 0) + 1;
-                    }
-
+                if (isPrayerRoll) {
+                    playerToUpdate.meritPoints -= 5;
+                    playerToUpdate.diceRollHistory.push({ value: roll, type: 'prayer', isGoodRoll: false });
+                } else {
                     const currentRealmCategory = getRealmCategory(oldPosition);
                     const goodRealms = ['animal', 'asura', 'human', 'deva'];
                     if (goodRealms.includes(currentRealmCategory) && (roll === 1 || roll === 2)) {
                         isGoodRoll = true;
                         const meritGained = (roll === 1 ? 2 : 1);
-                        playerToUpdate.meritPoints = (playerToUpdate.meritPoints || 0) + meritGained;
+                        playerToUpdate.meritPoints += meritGained;
                         notification = { title: 'Tán thán Công đức!', result: `+${meritGained} công đức`, message: `Nhờ phước báu, bạn nhận được ${meritGained} công đức.` };
                     }
                     playerToUpdate.diceRollHistory.push({ value: roll, type: 'normal', isGoodRoll: isGoodRoll });
-
-                    let nextSquareNumber = oldPosition;
-                    if (oldSquare && oldSquare.moves) {
-                        const movedTo = oldSquare.moves[roll.toString()];
-                        if (movedTo !== undefined) {
-                            nextSquareNumber = movedTo;
-                        }
-                    }
-                    const newSquare = boardSquaresMap.get(nextSquareNumber);
-                    notification.result = notification.result || `Gieo được ${roll}, đến cõi ${newSquare.name}`;
-
-                    if (nextSquareNumber !== oldPosition) {
-                        playerToUpdate.position = nextSquareNumber;
-                        playerToUpdate.realmHistory.push({ pos: nextSquareNumber, type: 'normal' });
-                        const newRealmCategory = getRealmCategory(nextSquareNumber);
-                        
-                        if ([26, 62, 65, 67, 68, 69, 72].includes(nextSquareNumber)) { 
-                            const arrivalMerit = (nextSquareNumber === 26) ? 10 : 5;
-                            playerToUpdate.meritPoints = (playerToUpdate.meritPoints || 0) + arrivalMerit;
-                            notification.title = 'Thành tựu!';
-                            notification.message = `Bạn đã trở thành Chuyển Luân/Trì Minh Vương và nhận ${arrivalMerit} công đức.`;
-                        } else if (newRealmCategory === 'hell' || newRealmCategory === 'preta') {
-                            notification.title = 'Quả báo đã trổ!';
-                        } else if (newRealmCategory === 'deva' || newRealmCategory === 'pureland') {
-                            notification.title = 'Chúc mừng!';
-                        }
-                    }
-                    notification.message = notification.message || generateKarmaSummary(oldSquare, newSquare, roll);
                 }
 
-                const nextPlayerIndex = (localGameState.currentPlayerIndex + 1) % newPlayersArray.length;
+                let nextSquareNumber = oldPosition; // Default to staying in the same place
+                if (oldSquare && oldSquare.moves && oldSquare.moves[roll.toString()] !== undefined) {
+                    nextSquareNumber = oldSquare.moves[roll.toString()];
+                }
                 
-                const roomPath = `${ROOM_COLLECTION_NAME}/${SINGLE_ROOM_ID}`;
-                const roomRef = doc(db, roomPath);
-                try {
-                    await updateDoc(roomRef, {
-                        players: newPlayersArray,
-                        currentPlayerIndex: nextPlayerIndex,
-                        lastDiceRoll: roll,
-                        lastActivity: serverTimestamp()
-                    });
-                    showNotification(notification.title, notification.result, notification.message);
-                } catch (error) {
-                    console.error("Error updating game state:", error);
-                    rollDiceBtnEl.disabled = false; 
-                    skipTurnBtnEl.disabled = false;
+                const newSquare = boardSquaresMap.get(nextSquareNumber);
+                notification.result = notification.result || `Gieo được ${roll}, đến cõi ${newSquare.name}`;
+                
+                if (nextSquareNumber !== oldPosition) {
+                    playerToUpdate.position = nextSquareNumber;
+                    const skipTurns = newSquare.skipTurns || 0;
+                    playerToUpdate.skipTurnsRemaining = skipTurns;
+                    playerToUpdate.realmHistory.push({ pos: nextSquareNumber, type: 'normal', skip: skipTurns });
+                    
+                    const newRealmCategory = getRealmCategory(nextSquareNumber);
+                    if ([26, 62, 65, 67, 68, 69, 72].includes(nextSquareNumber)) { 
+                        const arrivalMerit = (nextSquareNumber === 26) ? 10 : 5;
+                        playerToUpdate.meritPoints += arrivalMerit;
+                        notification.title = 'Thành tựu!';
+                        notification.message = `Bạn đã trở thành Chuyển Luân/Trì Minh Vương và nhận ${arrivalMerit} công đức.`;
+                    } else if (newRealmCategory === 'hell' || newRealmCategory === 'preta') {
+                        notification.title = 'Quả báo đã trổ!';
+                    } else if (newRealmCategory === 'deva' || newRealmCategory === 'pureland') {
+                        notification.title = 'Chúc mừng!';
+                    }
+                }
+                notification.message = notification.message || generateKarmaSummary(oldSquare, newSquare, roll);
+            }
+
+            let nextPlayerIndex = (localGameState.currentPlayerIndex + 1) % newPlayersArray.length;
+            let newRoundCount = localGameState.roundCount || 0;
+            if (nextPlayerIndex === 0) newRoundCount++;
+
+            const roomPath = `${ROOM_COLLECTION_NAME}/${SINGLE_ROOM_ID}`;
+            const roomRef = doc(db, roomPath);
+            try {
+                await updateDoc(roomRef, {
+                    players: newPlayersArray,
+                    currentPlayerIndex: nextPlayerIndex,
+                    lastDiceRoll: roll,
+                    lastActivity: serverTimestamp(),
+                    roundCount: newRoundCount
+                });
+                showNotification(notification.title, notification.result, notification.message);
+            } catch (error) {
+                console.error("Error updating game state:", error);
+                rollDiceBtnEl.disabled = false;
+            }
+        }
+
+        async function handleRollDiceClick() {
+            const currentPlayer = localGameState.players[localGameState.currentPlayerIndex];
+            if (!localGameState || !localGameState.players || localGameState.status !== "playing" || !currentPlayer || currentPlayer.uid !== currentUserId) return;
+            
+            rollDiceBtnEl.disabled = true;
+            const roll = Math.floor(Math.random() * 6) + 1;
+            originalRollForPrayer = roll;
+            
+            diceResultDisplayEl.style.display = 'none';
+            diceCubeEl.classList.add('is-rolling');
+
+            setTimeout(async () => {
+                diceCubeEl.classList.remove('is-rolling');
+                diceResultDisplayEl.textContent = roll;
+                diceResultDisplayEl.style.display = 'flex';
+                
+                const player = localGameState.players.find(p => p.uid === currentUserId);
+                const realmCategory = getRealmCategory(player.position);
+                const lowRealms = ['hell', 'preta', 'animal', 'asura', 'nonbuddhist'];
+
+                if (roll >= 3 && player.meritPoints >= 5 && lowRealms.includes(realmCategory)) {
+                    prayerModalEl.style.display = 'flex';
+                } else {
+                    await proceedWithMove(roll, false);
                 }
             }, 1500);
         }
 
         async function handleSkipTurnClick() {
             if (!localGameState || !localGameState.players || localGameState.status !== "playing") return;
-
-            const currentPlayer = localGameState.players[localGameState.currentPlayerIndex];
+            const currentPlayerIndex = localGameState.currentPlayerIndex;
+            const currentPlayer = localGameState.players[currentPlayerIndex];
             if (!currentPlayer || currentPlayer.uid !== currentUserId) return;
 
-            rollDiceBtnEl.disabled = true;
             skipTurnBtnEl.disabled = true;
-
-            const nextPlayerIndex = (localGameState.currentPlayerIndex + 1) % localGameState.players.length;
             const roomPath = `${ROOM_COLLECTION_NAME}/${SINGLE_ROOM_ID}`;
             const roomRef = doc(db, roomPath);
+
             try {
-                await updateDoc(roomRef, {
-                    currentPlayerIndex: nextPlayerIndex,
-                    lastDiceRoll: null, // Clear last roll when skipping
-                    lastActivity: serverTimestamp()
+                await runTransaction(db, async (transaction) => {
+                    const roomDoc = await transaction.get(roomRef);
+                    if (!roomDoc.exists()) throw "Room does not exist!";
+                    const roomData = roomDoc.data();
+                    
+                    const players = roomData.players;
+                    const playerToUpdate = players[currentPlayerIndex];
+                    
+                    // Reset request flags at the end of the turn
+                    playerToUpdate.hasRequestedSalvation = false;
+                    playerToUpdate.hasRequestedPractice = false;
+
+                    if (playerToUpdate.skipTurnsRemaining > 0) {
+                        playerToUpdate.skipTurnsRemaining -= 1;
+                    }
+                    
+                    const nextPlayerIndex = (currentPlayerIndex + 1) % players.length;
+                    transaction.update(roomRef, {
+                        players: players,
+                        currentPlayerIndex: nextPlayerIndex,
+                        lastActivity: serverTimestamp()
+                    });
                 });
             } catch (error) {
                 console.error("Error skipping turn:", error);
-                rollDiceBtnEl.disabled = false;
                 skipTurnBtnEl.disabled = false;
             }
+        }
+        
+        async function handleRequestSalvationClick() {
+            requestSalvationBtnEl.disabled = true; 
+            const roomPath = `${ROOM_COLLECTION_NAME}/${SINGLE_ROOM_ID}`;
+            const roomRef = doc(db, roomPath);
+            await updateDoc(roomRef, {
+                players: localGameState.players.map(p => p.uid === currentUserId ? { ...p, hasRequestedSalvation: true } : p)
+            });
+            showNotification("Đã gửi thỉnh cầu", "", "Lời thỉnh cầu cứu độ của bạn đã được gửi đến các cõi giới cao hơn. Hãy kiên nhẫn chờ đợi.");
+        }
+
+        async function handleSalvationClick() {
+            const roomPath = `${ROOM_COLLECTION_NAME}/${SINGLE_ROOM_ID}`;
+            const roomRef = doc(db, roomPath);
+            let helperNotificationMessage = "";
+
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const roomDoc = await transaction.get(roomRef);
+                    if (!roomDoc.exists()) throw "Room not found";
+                    const roomData = roomDoc.data();
+                    
+                    let players = roomData.players;
+                    let helper = players.find(p => p.uid === currentUserId);
+                    
+                    if (helper.meritPoints < 5) {
+                        throw new Error("Không đủ công đức.");
+                    }
+                    
+                    const isSavingFromHell = players.some(p => p.hasRequestedSalvation);
+                    
+                    if (isSavingFromHell) {
+                        helper.meritPoints -= 5;
+                        const requesters = players.filter(p => p.hasRequestedSalvation);
+                        if (requesters.length > 0) {
+                            const luckyOne = requesters[Math.floor(Math.random() * requesters.length)];
+                            luckyOne.skipTurnsRemaining = Math.max(0, luckyOne.skipTurnsRemaining - 1);
+                            luckyOne.notifications.push({
+                                title: "Được Cứu Độ!",
+                                result: "Bạn được giảm 1 lượt bị giam giữ.",
+                                message: `${helper.name} đã dùng công đức để cứu độ bạn.`
+                            });
+                            helperNotificationMessage = `Bạn đã dùng công đức của mình để cứu độ cho ${luckyOne.name}. Lành thay!`;
+                        }
+                        players.forEach(p => p.hasRequestedSalvation = false);
+                    } else { // Practice & Pray
+                        helper.meritPoints -= 5;
+                        const practiceRequesters = players.filter(p => p.hasRequestedPractice);
+                        if (practiceRequesters.length > 0) {
+                            const target = practiceRequesters[0]; 
+                            target.meritPoints += 5;
+                            target.notifications.push({
+                                title: "Nhận được Trợ giúp!",
+                                result: "Bạn nhận được 5 Công đức.",
+                                message: `${helper.name} đã trợ giúp bạn thực hành.`
+                            });
+                            helperNotificationMessage = `Bạn đã chuyển 5 công đức để trợ giúp ${target.name} thực hành. Lành thay!`;
+                        }
+                        players.forEach(p => p.hasRequestedPractice = false);
+                    }
+                    
+                    transaction.update(roomRef, { players: players });
+                });
+                showNotification("Cứu độ thành công", "", helperNotificationMessage);
+            } catch (error) {
+                console.error("Salvation error:", error);
+                 if (error.message === "Không đủ công đức.") {
+                    showNotification("Không thể Cứu độ", "Bạn không đủ 5 công đức.", "Hãy chăm chỉ tích đức làm thiện để tích lũy công đức, nhờ đó mới cứu độ được chúng sinh.");
+                } else {
+                    showNotification("Lỗi", "", "Không thể thực hiện cứu độ: " + error.message);
+                }
+            }
+        }
+
+        async function handlePracticePrayClick() {
+            practicePrayBtnEl.disabled = true; 
+            const roomPath = `${ROOM_COLLECTION_NAME}/${SINGLE_ROOM_ID}`;
+            const roomRef = doc(db, roomPath);
+            await updateDoc(roomRef, {
+                players: localGameState.players.map(p => p.uid === currentUserId ? { ...p, hasRequestedPractice: true } : p)
+            });
+            showNotification("Đã gửi thỉnh cầu", "", "Bạn đã phát tâm thực hành và cầu nguyện. Chư vị ở các cõi giới cao hơn có thể sẽ trợ giúp bạn.");
+        }
+
+        async function handleChallengeClick() {
+            const roomPath = `${ROOM_COLLECTION_NAME}/${SINGLE_ROOM_ID}`;
+            const roomRef = doc(db, roomPath);
+
+            await runTransaction(db, async (transaction) => {
+                const roomDoc = await transaction.get(roomRef);
+                if (!roomDoc.exists()) return;
+                const roomData = roomDoc.data();
+                const challengeState = roomData.challengeState || { isActive: false };
+                const clientPlayer = roomData.players.find(p => p.uid === currentUserId);
+
+                if (isCurrentUserAdmin && !challengeState.isActive) {
+                    const challengeRealms = ['human', 'preta', 'animal', 'deva'];
+                    const currentRealm = getRealmCategory(clientPlayer.position);
+                    if (!challengeRealms.includes(currentRealm)) return;
+                    
+                    const requiredParticipants = roomData.players
+                        .filter(p => p.position === clientPlayer.position)
+                        .map(p => p.uid);
+
+                    if (requiredParticipants.length < 2) return;
+
+                    const newChallengeState = {
+                        isActive: true,
+                        initiator: currentUserId,
+                        realmPosition: clientPlayer.position,
+                        participants: [currentUserId],
+                        requiredParticipants: requiredParticipants,
+                        rolls: {}
+                    };
+                    transaction.update(roomRef, { challengeState: newChallengeState });
+
+                } else if (challengeState.isActive && challengeState.requiredParticipants.includes(currentUserId)) {
+                    const hasAccepted = challengeState.participants.includes(currentUserId);
+                    if (hasAccepted) return;
+
+                    challengeState.participants.push(currentUserId);
+
+                    if (challengeState.participants.length === challengeState.requiredParticipants.length) {
+                        // All accepted, execute challenge
+                        let totalRoll = 0;
+                        challengeState.requiredParticipants.forEach(uid => {
+                            const roll = Math.floor(Math.random() * 6) + 1;
+                            challengeState.rolls[uid] = roll;
+                            totalRoll += roll;
+                        });
+
+                        const numParticipants = challengeState.requiredParticipants.length;
+                        const averageTarget = 3.5 * numParticipants;
+                        const points = numParticipants >= 4 ? 4 : (numParticipants === 3 ? 3 : 2);
+                        
+                        let meritChange = 0;
+                        let outcomeMessage = "";
+
+                        if (totalRoll < averageTarget) {
+                            meritChange = points;
+                            outcomeMessage = `Cộng nghiệp thiện đã trổ quả! Mọi người nhận được ${points} công đức.`;
+                        } else if (totalRoll > averageTarget) {
+                            meritChange = -points;
+                            outcomeMessage = `Cộng nghiệp ác đã trổ quả! Mọi người bị trừ ${points} công đức.`;
+                        } else {
+                            outcomeMessage = "Cộng nghiệp trung tính, không có gì thay đổi.";
+                        }
+                        
+                        const updatedPlayers = roomData.players.map(p => {
+                            if (challengeState.requiredParticipants.includes(p.uid)) {
+                                p.meritPoints += meritChange;
+                                p.notifications.push({
+                                    title: "Kết quả Challenge",
+                                    result: `Tổng điểm gieo: ${totalRoll}`,
+                                    message: outcomeMessage
+                                });
+                            }
+                            return p;
+                        });
+                        
+                        transaction.update(roomRef, { 
+                            players: updatedPlayers,
+                            challengeState: { isActive: false }
+                        });
+
+                    } else {
+                        // Still waiting for others
+                        transaction.update(roomRef, { challengeState: challengeState });
+                    }
+                }
+            });
         }
 
         async function handleAdminUpdateMerit() {
             if (!isCurrentUserAdmin || !localGameState || !localGameState.players) return;
-            
             const playerName = adminMeritPlayerNameInputEl.value.trim();
             const action = document.querySelector('input[name="adminMeritAction"]:checked').value;
             const points = parseInt(adminMeritPointsInputEl.value);
-
-            if (!playerName || isNaN(points) || points <= 0) {
-                alert("Vui lòng nhập tên người chơi và số công đức hợp lệ.");
-                return;
-            }
-
+            if (!playerName || isNaN(points) || points <= 0) { alert("Vui lòng nhập tên người chơi và số công đức hợp lệ."); return; }
             adminUpdateMeritBtnEl.disabled = true;
-
             let newPlayersArray = JSON.parse(JSON.stringify(localGameState.players)); 
             let playerToUpdate = newPlayersArray.find(p => p.name.toLowerCase() === playerName.toLowerCase());
-            
             if(playerToUpdate) {
                 const currentMerit = playerToUpdate.meritPoints || 0;
-                if (action === 'increase') {
-                    playerToUpdate.meritPoints = currentMerit + points;
-                } else if (action === 'decrease') {
-                    playerToUpdate.meritPoints = currentMerit - points;
-                }
+                playerToUpdate.meritPoints = action === 'increase' ? currentMerit + points : currentMerit - points;
             } else {
                 alert(`Không tìm thấy người chơi "${playerName}".`);
-                adminUpdateMeritBtnEl.disabled = false;
-                return;
+                adminUpdateMeritBtnEl.disabled = false; return;
             }
-
             const roomPath = `${ROOM_COLLECTION_NAME}/${SINGLE_ROOM_ID}`;
             const roomRef = doc(db, roomPath);
-            try {
-                await updateDoc(roomRef, {
-                    players: newPlayersArray,
-                    lastActivity: serverTimestamp()
-                });
-            } catch (error) {
-                console.error("Error updating merit points:", error);
-            } finally {
-                adminUpdateMeritBtnEl.disabled = false;
-            }
-        }
-
-        async function handleSpecialDiceClick() {
-            if (!localGameState || !localGameState.players) return;
-            
-            specialDiceBtnEl.disabled = true;
-            const roll = Math.floor(Math.random() * 6) + 1;
-
-            let newPlayersArray = JSON.parse(JSON.stringify(localGameState.players)); 
-            let playerToUpdate = newPlayersArray.find(p => p.uid === currentUserId);
-            
-            if(playerToUpdate) {
-                if (!playerToUpdate.diceRollHistory) playerToUpdate.diceRollHistory = [];
-                playerToUpdate.diceRollHistory.push({ value: roll, type: 'special', isGoodRoll: false });
-            } else {
-                specialDiceBtnEl.disabled = false;
-                return;
-            }
-
-            const roomPath = `${ROOM_COLLECTION_NAME}/${SINGLE_ROOM_ID}`;
-            const roomRef = doc(db, roomPath);
-            try {
-                await updateDoc(roomRef, {
-                    players: newPlayersArray,
-                    lastActivity: serverTimestamp()
-                });
-            } catch (error) {
-                console.error("Error updating game state for special dice:", error);
-            } finally {
-                specialDiceBtnEl.disabled = false;
-            }
+            try { await updateDoc(roomRef, { players: newPlayersArray, lastActivity: serverTimestamp() }); } 
+            catch (error) { console.error("Error updating merit points:", error); } 
+            finally { adminUpdateMeritBtnEl.disabled = false; }
         }
 
         async function handleAdminMovePlayer() {
             if (!isCurrentUserAdmin || !localGameState || !localGameState.players) return;
-            
             const playerName = adminPlayerNameInputEl.value.trim();
             const newPosition = parseInt(adminPositionInputEl.value);
-
-            if (!playerName || isNaN(newPosition) || newPosition < 1 || newPosition > 104) {
-                alert("Vui lòng nhập tên và vị trí hợp lệ (1-104).");
-                return;
-            }
-
+            if (!playerName || isNaN(newPosition) || newPosition < 1 || newPosition > 104) { alert("Vui lòng nhập tên và vị trí hợp lệ (1-104)."); return; }
             adminMovePlayerBtnEl.disabled = true;
-
             let newPlayersArray = JSON.parse(JSON.stringify(localGameState.players)); 
             let playerToUpdate = newPlayersArray.find(p => p.name.toLowerCase() === playerName.toLowerCase());
-
             if (playerToUpdate) {
                 playerToUpdate.position = newPosition;
-                if (!playerToUpdate.realmHistory) playerToUpdate.realmHistory = [];
-                playerToUpdate.realmHistory.push({ pos: newPosition, type: 'manual' });
+                playerToUpdate.realmHistory.push({ pos: newPosition, type: 'manual', skip: 0 });
             } else {
                 alert(`Không tìm thấy người chơi "${playerName}".`);
-                adminMovePlayerBtnEl.disabled = false;
-                return;
+                adminMovePlayerBtnEl.disabled = false; return;
             }
-
             const roomPath = `${ROOM_COLLECTION_NAME}/${SINGLE_ROOM_ID}`;
             const roomRef = doc(db, roomPath);
-            try {
-                await updateDoc(roomRef, {
-                    players: newPlayersArray,
-                    lastActivity: serverTimestamp()
-                });
-            } catch (error) {
-                console.error("Error moving player:", error);
-            } finally {
-                adminMovePlayerBtnEl.disabled = false;
-            }
+            try { await updateDoc(roomRef, { players: newPlayersArray, lastActivity: serverTimestamp() }); } 
+            catch (error) { console.error("Error moving player:", error); } 
+            finally { adminMovePlayerBtnEl.disabled = false; }
         }
 
         async function handleAdminGameControlClick() {
             if (!isCurrentUserAdmin) return;
             const roomPath = `${ROOM_COLLECTION_NAME}/${SINGLE_ROOM_ID}`;
             const roomRef = doc(db, roomPath);
-            
             adminGameControlBtnEl.disabled = true;
             const roomDoc = await getDoc(roomRef);
             if (roomDoc.exists()) {
                 const roomData = roomDoc.data();
-                if (roomData.status === 'playing') {
-                    // End the game by deleting the room
-                    await deleteDoc(roomRef);
-                } else {
-                    // Start the game
-                    await updateDoc(roomRef, { status: 'playing' });
-                }
+                if (roomData.status === 'playing') await deleteDoc(roomRef);
+                else await updateDoc(roomRef, { status: 'playing' });
             }
              adminGameControlBtnEl.disabled = false;
         }
 
         async function handleKickPlayerClick(uidToKick) {
             if (!isCurrentUserAdmin || !localGameState || !localGameState.players) return;
-
             let newPlayersArray = localGameState.players.filter(p => p.uid !== uidToKick);
             const roomPath = `${ROOM_COLLECTION_NAME}/${SINGLE_ROOM_ID}`;
             const roomRef = doc(db, roomPath);
@@ -1187,9 +1353,7 @@ const app = initializeApp(firebaseConfig);
                     currentPlayerIndex: localGameState.currentPlayerIndex % newPlayersArray.length,
                     lastActivity: serverTimestamp()
                 });
-            } catch (error) {
-                console.error("Error kicking player:", error);
-            }
+            } catch (error) { console.error("Error kicking player:", error); }
         }
         
         document.addEventListener('DOMContentLoaded', async () => {
@@ -1208,9 +1372,9 @@ const app = initializeApp(firebaseConfig);
             leaveGameBtnEl = document.getElementById('leaveGameBtn');
             diceResultDisplayEl = document.getElementById('diceResultDisplay');
             diceCubeEl = document.getElementById('diceCube');
-            specialDiceBtnEl = document.getElementById('specialDiceBtn');
             panelToggleButtonEl = document.getElementById('panelToggleButton');
             skipTurnBtnEl = document.getElementById('skipTurnBtn');
+            skipTurnInfoEl = document.getElementById('skipTurnInfo');
             adminPanelEl = document.getElementById('adminPanel');
             adminGameControlBtnEl = document.getElementById('adminGameControlBtn');
             notificationModalEl = document.getElementById('notificationModal');
@@ -1218,8 +1382,14 @@ const app = initializeApp(firebaseConfig);
             notificationResultEl = document.getElementById('notificationResult');
             notificationMessageEl = document.getElementById('notificationMessage');
             closeNotificationBtnEl = document.getElementById('closeNotificationBtn');
+            prayerModalEl = document.getElementById('prayerModal');
+            confirmPrayerBtnEl = document.getElementById('confirmPrayerBtn');
+            cancelPrayerBtnEl = document.getElementById('cancelPrayerBtn');
+            challengeBtnEl = document.getElementById('challengeBtn');
+            requestSalvationBtnEl = document.getElementById('requestSalvationBtn');
+            practicePrayBtnEl = document.getElementById('practicePrayBtn');
+            salvationBtnEl = document.getElementById('salvationBtn');
             
-            // Admin-specific DOM elements
             adminMovePlayerBtnEl = document.getElementById('adminMovePlayerBtn');
             adminUpdateMeritBtnEl = document.getElementById('adminUpdateMeritBtn');
             adminPlayerNameInputEl = document.getElementById('adminPlayerNameInput');
@@ -1227,14 +1397,12 @@ const app = initializeApp(firebaseConfig);
             adminMeritPlayerNameInputEl = document.getElementById('adminMeritPlayerNameInput');
             adminMeritPointsInputEl = document.getElementById('adminMeritPointsInput');
 
-
-            if (!firebaseConfig || !firebaseConfig.apiKey || firebaseConfig.apiKey === "YOUR_API_KEY") {
-                document.body.innerHTML = '<div style="padding: 20px; text-align: center; font-size: 1.2rem;"><h1>Lỗi Cấu hình</h1><p>Bạn chưa cung cấp cấu hình Firebase. Vui lòng chỉnh sửa mã nguồn, dán cấu hình của bạn vào biến `firebaseConfig` và thử lại.</p></div>';
+            if (!firebaseConfig || !firebaseConfig.apiKey) {
+                document.body.innerHTML = '<div style="padding: 20px; text-align: center; font-size: 1.2rem;"><h1>Lỗi Cấu hình</h1><p>Bạn chưa cung cấp cấu hình Firebase. Vui lòng chỉnh sửa mã nguồn và thử lại.</p></div>';
                 return;
             }
             
             try {
-                // const app = initializeApp(firebaseConfig); // Already initialized globally
                 auth = getAuth(app);
                 db = getFirestore(app);
             } catch (e) {
@@ -1243,40 +1411,44 @@ const app = initializeApp(firebaseConfig);
             }
 
             showScreen(authOverlayEl); 
-
             onAuthStateChanged(auth, async (user) => {
                 if (user) {
                     currentUserId = user.uid;
                     showScreen(entryScreenEl);
                     loadingScreenEl.style.display = 'none';
                 } else {
-                    try {
-                        await signInAnonymously(auth);
-                    } catch (error) {
-                       showScreen(loadingScreenEl);
-                       loadingScreenEl.innerHTML = "<p>Lỗi xác thực. Vui lòng tải lại trang.</p>";
-                    }
+                    try { await signInAnonymously(auth); } 
+                    catch (error) { loadingScreenEl.innerHTML = "<p>Lỗi xác thực. Vui lòng tải lại trang.</p>"; }
                 }
             });
             
             // Event listeners
-            if(joinGameBtnEl) joinGameBtnEl.addEventListener('click', joinGame);
-            if(rollDiceBtnEl) rollDiceBtnEl.addEventListener('click', handleRollDiceClick);
-            if(skipTurnBtnEl) skipTurnBtnEl.addEventListener('click', handleSkipTurnClick);
-            if(specialDiceBtnEl) specialDiceBtnEl.addEventListener('click', handleSpecialDiceClick);
-            if(leaveGameBtnEl) leaveGameBtnEl.addEventListener('click', leaveGame);
-            if(adminMovePlayerBtnEl) adminMovePlayerBtnEl.addEventListener('click', handleAdminMovePlayer);
-            if(adminUpdateMeritBtnEl) adminUpdateMeritBtnEl.addEventListener('click', handleAdminUpdateMerit);
-            if(adminGameControlBtnEl) adminGameControlBtnEl.addEventListener('click', handleAdminGameControlClick);
-            if(panelToggleButtonEl) panelToggleButtonEl.addEventListener('click', () => {
+            joinGameBtnEl.addEventListener('click', joinGame);
+            rollDiceBtnEl.addEventListener('click', handleRollDiceClick);
+            skipTurnBtnEl.addEventListener('click', handleSkipTurnClick);
+            leaveGameBtnEl.addEventListener('click', leaveGame);
+            adminMovePlayerBtnEl.addEventListener('click', handleAdminMovePlayer);
+            adminUpdateMeritBtnEl.addEventListener('click', handleAdminUpdateMerit);
+            adminGameControlBtnEl.addEventListener('click', handleAdminGameControlClick);
+            panelToggleButtonEl.addEventListener('click', () => {
                 controlPanelEl.classList.toggle('collapsed');
                 panelToggleButtonEl.classList.toggle('collapsed');
             });
-            if(closeNotificationBtnEl) closeNotificationBtnEl.addEventListener('click', () => {
-                notificationModalEl.style.display = 'none';
+            closeNotificationBtnEl.addEventListener('click', () => notificationModalEl.style.display = 'none');
+            cancelPrayerBtnEl.addEventListener('click', async () => {
+                prayerModalEl.style.display = 'none';
+                await proceedWithMove(originalRollForPrayer, false);
             });
+            confirmPrayerBtnEl.addEventListener('click', async () => {
+                prayerModalEl.style.display = 'none';
+                const prayerRoll = Math.floor(Math.random() * 6) + 1;
+                await proceedWithMove(prayerRoll, true);
+            });
+            requestSalvationBtnEl.addEventListener('click', handleRequestSalvationClick);
+            salvationBtnEl.addEventListener('click', handleSalvationClick);
+            practicePrayBtnEl.addEventListener('click', handlePracticePrayClick);
+            challengeBtnEl.addEventListener('click', handleChallengeClick);
         });
-
     </script>
 </body>
 </html>
