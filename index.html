@@ -127,6 +127,16 @@
         .player-merit { font-size: 0.9rem; font-weight: bold; color: #2e7d32; }
         .negative-merit { color: #c62828; }
         
+        .realm-description {
+            font-size: 0.85rem;
+            font-style: italic;
+            color: #6d4c41;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed #d7c8a0;
+            text-align: left;
+        }
+
         .history-label { font-size: 0.8rem; font-weight: 600; color: #8c6b4f; text-transform: uppercase; margin: 10px 0 5px 0; }
         .history-rolls { display: flex; flex-wrap: wrap; gap: 8px; min-height: 30px; }
         .roll-item {
@@ -411,7 +421,7 @@
                 </div>
             </div>
             <div class="main-actions">
-                <button id="rollDiceBtn">Vô Thường</button>
+                <button id="rollDiceBtn">Vô Thường đến..</button>
                 <button id="skipTurnBtn">Tiếp Tục Kiếp Sống</button>
             </div>
             
@@ -651,6 +661,30 @@ const app = initializeApp(firebaseConfig);
             return '';
         }
 
+        function getSquareDescription(squareNumber) {
+            const category = getRealmCategory(squareNumber);
+            switch (category) {
+                case 'hell': return "Nỗi khổ của sự nóng và lạnh cùng cực, bị tra tấn không ngừng nghỉ, và tuổi thọ kéo dài hàng triệu năm trong đau đớn.";
+                case 'preta': return "Nỗi khổ của đói và khát triền miên. Bụng to như trống nhưng cổ họng nhỏ như kim, không thể nuốt thức ăn, và những gì ăn được đều biến thành lửa.";
+                case 'animal': return "Nỗi khổ của sự ngu si, bị săn đuổi, ăn thịt lẫn nhau, và bị con người bóc lột, giết hại.";
+                case 'human': return "Nỗi khổ của sinh, lão, bệnh, tử, cầu không được, oán ghét phải gặp nhau. Đây là cõi quý giá nhất để tu tập vì có đủ cả khổ đau và hạnh phúc để thúc đẩy sự giác ngộ.";
+                case 'asura': return "Nỗi khổ của sân giận và đố kỵ. Mặc dù có phước báu như chư thiên, họ liên tục chiến tranh với cõi trời vì ganh tị và không bao giờ có được sự bình yên.";
+                case 'deva': return "Nỗi khổ của sự xao lãng và cái chết bất ngờ. Chư thiên hưởng thụ lạc thú tột cùng, quên mất việc tu tập. Khi phước báu cạn kiệt, họ thấy trước cảnh đọa lạc và chịu đựng nỗi khổ tinh thần còn lớn hơn cả địa ngục.";
+                case 'nonbuddhist': return "Con đường này có thể dẫn đến các cõi trời cao nhưng vẫn nằm trong luân hồi. Vì không nhận ra tánh không và không phát triển lòng bi mẫn vô hạn, nó không thể dẫn đến giải thoát cuối cùng khỏi khổ đau.";
+                case 'hinayana': return "Con đường tập trung vào sự giải thoát cá nhân. Chỉ dẫn cốt tủy là thực hành Tứ Diệu Đế và Bát Chánh Đạo, quán chiếu về vô thường, khổ, và vô ngã để đạt được trạng thái A-la-hán, chấm dứt khổ đau cho riêng mình.";
+                case 'mahayana': return "Con đường của Bồ tát. Chỉ dẫn cốt tủy là phát Bồ đề tâm - tâm nguyện đạt giác ngộ vì lợi ích của tất cả chúng sinh, và thực hành Lục độ Ba-la-mật (Bố thí, Trì giới, Nhẫn nhục, Tinh tấn, Thiền định, Trí tuệ).";
+                case 'vajrayana': return "Con đường Kim Cương Thừa, phương tiện thiện xảo của Đại Thừa. Chỉ dẫn cốt tủy là thực hành các pháp Du-già Bổn tôn, quán thân thể là mandala của Phật, âm thanh là chân ngôn, và ý nghĩ là trí tuệ nguyên sơ, nhằm giác ngộ ngay trong một đời.";
+                default:
+                    if (squareNumber >= 71 && squareNumber <= 96) { // Bodhisattva Bhumis
+                        return "Bạn đã đạt được những cấp độ nhận thức sâu sắc về tánh không và lòng bi mẫn. Thành tựu tiếp theo là tiếp tục hoàn thiện các Ba-la-mật, tịnh hóa những che chướng vi tế và tăng cường khả năng cứu độ chúng sinh.";
+                    }
+                    if (squareNumber > 96) { // Buddhahood
+                        return "Trạng thái giác ngộ viên mãn, chấm dứt hoàn toàn khổ đau và luân hồi. Đây là mục tiêu cuối cùng, nơi trí tuệ và lòng bi mẫn hợp nhất.";
+                    }
+                    return "Mỗi chúng sinh đều có Phật tính. Hãy tinh tấn trên con đường của bạn.";
+            }
+        }
+
         function generateKarmaSummary(oldSquare, newSquare, roll) {
             if (oldSquare.number === newSquare.number) {
                  return `Gieo được ${roll}, không có nước đi được định sẵn. Bạn vẫn ở lại ${oldSquare.name}.`;
@@ -850,6 +884,9 @@ const app = initializeApp(firebaseConfig);
                         <div class="player-merit ${meritClass}">
                             ${player.meritPoints || 0} Công đức ${kickButtonHTML}
                         </div>
+                    </div>
+                    <div class="realm-description">
+                       ${getSquareDescription(currentPos)}
                     </div>
                     <div class="history-label">Lịch sử Cảnh giới:</div>
                     <div class="history-rolls">${realmHistoryHTML}</div>
