@@ -68,6 +68,10 @@
             max-width: 90%;
             width: 400px;
         }
+        #summaryModal .overlay-content {
+            width: auto;
+            max-width: 95%;
+        }
         .overlay-content h2 { color: #5d4037; margin-bottom: 20px; }
         .overlay-content label { color: #5d4037; display: block; margin-bottom: 5px; text-align: left;}
         .overlay-content input[type="text"] {
@@ -304,7 +308,7 @@
             transform: rotate(180deg);
         }
         
-        #notificationModal, #prayerModal {
+        #notificationModal, #prayerModal, #summaryModal {
             display: none;
         }
         #notificationModal .overlay-content, #prayerModal .overlay-content {
@@ -325,6 +329,31 @@
             font-style: italic;
             color: #6d4c41;
         }
+        #summaryTableContainer {
+            max-height: 60vh;
+            overflow-y: auto;
+            margin-top: 1rem;
+        }
+        #summaryTable {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        #summaryTable th, #summaryTable td {
+            border: 1px solid #d7c8a0;
+            padding: 8px;
+            text-align: left;
+        }
+        #summaryTable th {
+            background-color: #d7c8a0;
+            color: #5d4037;
+            position: sticky;
+            top: 0;
+        }
+        #summaryTable .top-1 { background-color: #FFD700; /* Gold */ }
+        #summaryTable .top-2 { background-color: #C0C0C0; /* Silver */ }
+        #summaryTable .top-3 { background-color: #CD7F32; /* Bronze */ }
+
 
         /* Mobile-first Control Panel */
         @media (max-width: 767px) {
@@ -477,6 +506,17 @@
             </div>
         </div>
     </div>
+
+    <!-- Summary Modal -->
+    <div id="summaryModal" class="full-screen-overlay">
+        <div class="overlay-content">
+            <h2 class="text-2xl font-bold">Bảng Tổng Kết Hành Trình Luân Hồi</h2>
+            <div id="summaryTableContainer">
+                <!-- Summary table will be injected here -->
+            </div>
+            <button id="endGameConfirmBtn" class="mt-4">Kết Thúc</button>
+        </div>
+    </div>
     
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -627,11 +667,12 @@ const app = initializeApp(firebaseConfig);
             adminPlayerNameInputEl, adminPositionInputEl, adminMeritPlayerNameInputEl, adminMeritPointsInputEl,
             notificationModalEl, notificationTitleEl, notificationMessageEl, closeNotificationBtnEl, notificationResultEl,
             prayerModalEl, confirmPrayerBtnEl, cancelPrayerBtnEl,
+            summaryModalEl, summaryTableContainerEl, endGameConfirmBtnEl,
             challengeBtnEl, requestSalvationBtnEl, practicePrayBtnEl, salvationBtnEl;
             
         // --- Utility Functions ---
         function showScreen(screenElement) {
-            [loadingScreenEl, authOverlayEl, entryScreenEl, gameWrapperEl].forEach(el => {if(el) el.style.display = 'none'});
+            [loadingScreenEl, authOverlayEl, entryScreenEl, gameWrapperEl, summaryModalEl].forEach(el => {if(el) el.style.display = 'none'});
             if (screenElement) {
                 screenElement.style.display = 'flex';
             }
@@ -661,6 +702,10 @@ const app = initializeApp(firebaseConfig);
         }
 
         function getSquareDescription(squareNumber) {
+            if (squareNumber === 12) return "Là loài thú có phước báu, nhưng vẫn chịu nỗi khổ của sự si mê, bản năng, và sự sợ hãi bị các loài mạnh hơn săn đuổi.";
+            if (squareNumber === 13) return "Loài Rồng có quyền năng và sự giàu có, nhưng tâm trí đầy sân hận, kiêu mạn và phải chịu đựng những cơn mưa nóng bỏng thiêu đốt da thịt.";
+            if (squareNumber === 16) return "Do tà kiến và nghiệp giết hại nặng nề, Rudra phải chịu khổ đau tột cùng trong một cõi riêng, liên tục trải qua sự chết đi sống lại trong cuộc chiến vô tận.";
+            if (squareNumber === 21) return "Sống trong si mê, bạo lực và tà kiến, không có khái niệm về thiện ác hay nhân quả. Cuộc sống của họ chỉ xoay quanh bản năng sinh tồn, tạo ra vô số ác nghiệp và chắc chắn đọa vào các cõi thấp sau khi chết.";
             if (squareNumber === 24) {
                 return "Cảnh giới Thân trung ấm đầy những khổ đau do tâm tạo ra, bạn đang trốn chạy khởi sự săn đuổi bởi những ngạ quỷ xấu ác, bạn thèm tìm kiếm 1 thân xác bất kỳ cho dù là cảnh giới nào đi nữa, Nghiệp lực dẫn bạn tới nơi cha mẹ của mình sắp tới ... bạn loanh quanh và chờ đợi thời điểm nghiệp lức kéo ...";
             }
@@ -734,7 +779,11 @@ const app = initializeApp(firebaseConfig);
                         realmHistory: [{pos: 24, type: 'start', skip: 0}], 
                         isAdmin: isCurrentUserAdmin, skipTurnsRemaining: 0,
                         hasRequestedSalvation: false, hasRequestedPractice: false,
-                        notifications: []
+                        notifications: [],
+                        meritSpentOnSalvation: 0,
+                        turnsInHell: 0,
+                        visitsToJambudvipa: 0,
+                        totalMoves: 0
                     };
                     
                     if (!roomDoc.exists()) {
@@ -809,7 +858,9 @@ const app = initializeApp(firebaseConfig);
                     const oldGameState = localGameState;
                     localGameState = docSnap.data();
                     
-                    if(gameWrapperEl.style.display !== 'none') {
+                    if (localGameState.status === 'finished' && oldGameState.status !== 'finished') {
+                        calculateAndShowSummary(localGameState.players);
+                    } else if(gameWrapperEl.style.display !== 'none') {
                         updatePlayerListUI(localGameState);
                         updateControlPanelUI(localGameState);
                         
@@ -834,10 +885,6 @@ const app = initializeApp(firebaseConfig);
                     }
                 } else {
                     localGameState = {};
-                    if (!isCurrentUserAdmin) {
-                        // Use a non-blocking notification instead of alert
-                        showNotification("Trò chơi đã kết thúc", "", "Phòng chơi đã được đóng bởi Admin hoặc người chủ phòng.");
-                    }
                     showScreen(entryScreenEl);
                     if (joinGameBtnEl) {
                         joinGameBtnEl.disabled = false;
@@ -1048,6 +1095,11 @@ const app = initializeApp(firebaseConfig);
                 
                 if (nextSquareNumber !== oldPosition) {
                     playerToUpdate.position = nextSquareNumber;
+                    playerToUpdate.totalMoves = (playerToUpdate.totalMoves || 0) + 1;
+                    if(nextSquareNumber === 17) {
+                        playerToUpdate.visitsToJambudvipa = (playerToUpdate.visitsToJambudvipa || 0) + 1;
+                    }
+
                     const skipTurns = newSquare.skipTurns || 0;
                     playerToUpdate.skipTurnsRemaining = skipTurns;
                     playerToUpdate.realmHistory.push({ pos: nextSquareNumber, type: 'normal', skip: skipTurns });
@@ -1141,6 +1193,9 @@ const app = initializeApp(firebaseConfig);
 
                     if (playerToUpdate.skipTurnsRemaining > 0) {
                         playerToUpdate.skipTurnsRemaining -= 1;
+                        if(getRealmCategory(playerToUpdate.position) === 'hell') {
+                            playerToUpdate.turnsInHell = (playerToUpdate.turnsInHell || 0) + 1;
+                        }
                     }
                     
                     const nextPlayerIndex = (currentPlayerIndex + 1) % players.length;
@@ -1188,6 +1243,7 @@ const app = initializeApp(firebaseConfig);
                     
                     if (isSavingFromHell) {
                         helper.meritPoints -= 5;
+                        helper.meritSpentOnSalvation = (helper.meritSpentOnSalvation || 0) + 5;
                         const requesters = players.filter(p => p.hasRequestedSalvation);
                         if (requesters.length > 0) {
                             const luckyOne = requesters[Math.floor(Math.random() * requesters.length)];
@@ -1202,6 +1258,7 @@ const app = initializeApp(firebaseConfig);
                         players.forEach(p => p.hasRequestedSalvation = false);
                     } else { // Practice & Pray
                         helper.meritPoints -= 5;
+                        helper.meritSpentOnSalvation = (helper.meritSpentOnSalvation || 0) + 5;
                         const practiceRequesters = players.filter(p => p.hasRequestedPractice);
                         if (practiceRequesters.length > 0) {
                             const target = practiceRequesters[0]; 
@@ -1381,10 +1438,68 @@ const app = initializeApp(firebaseConfig);
             const roomDoc = await getDoc(roomRef);
             if (roomDoc.exists()) {
                 const roomData = roomDoc.data();
-                if (roomData.status === 'playing') await deleteDoc(roomRef);
-                else await updateDoc(roomRef, { status: 'playing' });
+                if (roomData.status === 'playing') {
+                    await updateDoc(roomRef, { status: 'finished' });
+                } else {
+                    await updateDoc(roomRef, { status: 'playing' });
+                }
             }
              adminGameControlBtnEl.disabled = false;
+        }
+
+        function calculateAndShowSummary(players) {
+            const nonAdminPlayers = players.filter(p => !p.isAdmin);
+
+            nonAdminPlayers.sort((a, b) => {
+                if (b.position !== a.position) {
+                    return b.position - a.position;
+                }
+                return (b.meritPoints || 0) - (a.meritPoints || 0);
+            });
+
+            let tableHTML = `<table id="summaryTable">
+                <thead>
+                    <tr>
+                        <th>Top</th>
+                        <th>Tên người chơi</th>
+                        <th>Cảnh giới cuối</th>
+                        <th>Công đức</th>
+                        <th>CĐ Cứu độ</th>
+                        <th>Lượt ở Địa ngục</th>
+                        <th>Tỷ lệ cõi Người</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+            
+            nonAdminPlayers.forEach((player, index) => {
+                let rowClass = "";
+                if (index === 0) rowClass = "top-1";
+                else if (index === 1) rowClass = "top-2";
+                else if (index === 2) rowClass = "top-3";
+
+                const finalPos = player.position || 24;
+                const squareName = boardSquaresMap.get(finalPos)?.name || "Không xác định";
+                const merit = player.meritPoints || 0;
+                const meritSpent = player.meritSpentOnSalvation || 0;
+                const hellTurns = player.turnsInHell || 0;
+                const jambuVisits = player.visitsToJambudvipa || 0;
+                const totalMoves = player.totalMoves || 1; 
+                const jambuRatio = `${jambuVisits}/${totalMoves}`;
+
+                tableHTML += `<tr class="${rowClass}">
+                    <td>${index + 1}</td>
+                    <td>${player.name}</td>
+                    <td>${squareName}</td>
+                    <td>${merit}</td>
+                    <td>${meritSpent}</td>
+                    <td>${hellTurns}</td>
+                    <td>${jambuRatio}</td>
+                </tr>`;
+            });
+            tableHTML += `</tbody></table>`;
+
+            summaryTableContainerEl.innerHTML = tableHTML;
+            summaryModalEl.style.display = 'flex';
         }
 
         async function handleKickPlayerClick(uidToKick) {
@@ -1430,6 +1545,9 @@ const app = initializeApp(firebaseConfig);
             prayerModalEl = document.getElementById('prayerModal');
             confirmPrayerBtnEl = document.getElementById('confirmPrayerBtn');
             cancelPrayerBtnEl = document.getElementById('cancelPrayerBtn');
+            summaryModalEl = document.getElementById('summaryModal');
+            summaryTableContainerEl = document.getElementById('summaryTableContainer');
+            endGameConfirmBtnEl = document.getElementById('endGameConfirmBtn');
             challengeBtnEl = document.getElementById('challengeBtn');
             requestSalvationBtnEl = document.getElementById('requestSalvationBtn');
             practicePrayBtnEl = document.getElementById('practicePrayBtn');
@@ -1488,6 +1606,14 @@ const app = initializeApp(firebaseConfig);
                 prayerModalEl.style.display = 'none';
                 const prayerRoll = Math.floor(Math.random() * 6) + 1;
                 await proceedWithMove(prayerRoll, true);
+            });
+            endGameConfirmBtnEl.addEventListener('click', async () => {
+                if (isCurrentUserAdmin) {
+                    const roomPath = `${ROOM_COLLECTION_NAME}/${SINGLE_ROOM_ID}`;
+                    const roomRef = doc(db, roomPath);
+                    await deleteDoc(roomRef);
+                }
+                 showScreen(entryScreenEl); // All players will see this
             });
             requestSalvationBtnEl.addEventListener('click', handleRequestSalvationClick);
             salvationBtnEl.addEventListener('click', handleSalvationClick);
