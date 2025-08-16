@@ -661,6 +661,9 @@ const app = initializeApp(firebaseConfig);
         }
 
         function getSquareDescription(squareNumber) {
+            if (squareNumber === 24) {
+                return "Cảnh giới Thân trung ấm đầy những khổ đau do tâm tạo ra, bạn đang trốn chạy khởi sự săn đuổi bởi những ngạ quỷ xấu ác, bạn thèm tìm kiếm 1 thân xác bất kỳ cho dù là cảnh giới nào đi nữa, Nghiệp lực dẫn bạn tới nơi cha mẹ của mình sắp tới ... bạn loanh quanh và chờ đợi thời điểm nghiệp lức kéo ...";
+            }
             const category = getRealmCategory(squareNumber);
             switch (category) {
                 case 'hell': return "Nỗi khổ của sự nóng và lạnh cùng cực, bị tra tấn không ngừng nghỉ, và tuổi thọ kéo dài hàng triệu năm trong đau đớn.";
@@ -686,7 +689,7 @@ const app = initializeApp(firebaseConfig);
 
         function generateKarmaSummary(oldSquare, newSquare, roll) {
             if (oldSquare.number === newSquare.number) {
-                 return `Gieo được ${roll}, không có nước đi được định sẵn. Bạn vẫn ở lại ${oldSquare.name}.`;
+                 return `Gieo được ${roll}, Kiếp sống bạn không có sự nỗ lực, bạn vẫn tiếp tục rơi vào cái bẫy tu tập và bạn không tiến được. Bạn vẫn ở lại ${oldSquare.name}.`;
             }
             switch (roll) {
                 case 1: return `Cực thiện nghiệp trổ quả! Một nhân duyên hy hữu đã đưa bạn từ ${oldSquare.name} thẳng đến cảnh giới an lành ${newSquare.name}.`;
@@ -831,8 +834,14 @@ const app = initializeApp(firebaseConfig);
                     }
                 } else {
                     localGameState = {};
-                    if (!isCurrentUserAdmin) alert("Trò chơi đã kết thúc bởi Admin.");
+                    if (!isCurrentUserAdmin) {
+                        // Use a non-blocking notification instead of alert
+                        showNotification("Trò chơi đã kết thúc", "", "Phòng chơi đã được đóng bởi Admin hoặc người chủ phòng.");
+                    }
                     showScreen(entryScreenEl);
+                    if (joinGameBtnEl) {
+                        joinGameBtnEl.disabled = false;
+                    }
                 }
             }, (error) => {
                 console.error("Error listening to room updates:", error);
@@ -1185,7 +1194,7 @@ const app = initializeApp(firebaseConfig);
                             luckyOne.skipTurnsRemaining = Math.max(0, luckyOne.skipTurnsRemaining - 1);
                             luckyOne.notifications.push({
                                 title: "Được Cứu Độ!",
-                                result: "Bạn được giảm 1 lượt bị giam giữ.",
+                                result: "Bạn được giảm 1 phần kiếp sống khổ đau thông qua lòng bi mẫn của chư vị phát khởi tâm bồ tát.",
                                 message: `${helper.name} đã dùng công đức để cứu độ bạn.`
                             });
                             helperNotificationMessage = `Bạn đã dùng công đức của mình để cứu độ cho ${luckyOne.name}. Lành thay!`;
