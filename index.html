@@ -136,7 +136,8 @@
             font-style: italic;
             color: #6d4c41;
             margin-top: 10px;
-            padding-top: 0px;
+            padding-top: 10px;
+            border-top: 1px dashed #d7c8a0;
             text-align: left;
         }
 
@@ -795,7 +796,7 @@ const app = initializeApp(firebaseConfig);
         function showNotification(title, resultText, message) {
             notificationTitleEl.textContent = title;
             notificationResultEl.innerHTML = resultText;
-            notificationMessageEl.innerHTML = message; // Use innerHTML to render bold tags
+            notificationMessageEl.innerHTML = message;
             notificationModalEl.style.display = 'flex';
         }
 
@@ -1164,6 +1165,21 @@ const app = initializeApp(firebaseConfig);
                         playerToUpdate.visitsToJambudvipa = (playerToUpdate.visitsToJambudvipa || 0) + 1;
                     }
 
+                    // BUG FIX 1: Update relationships on move
+                    if (!playerToUpdate.isAdmin) {
+                        newPlayersArray.forEach(otherPlayer => {
+                            if (otherPlayer.uid !== playerToUpdate.uid && !otherPlayer.isAdmin && otherPlayer.position === nextSquareNumber) {
+                                // Initialize relationship objects if they don't exist
+                                if (!playerToUpdate.relationships) playerToUpdate.relationships = {};
+                                if (!otherPlayer.relationships) otherPlayer.relationships = {};
+
+                                // Increment count for both players
+                                playerToUpdate.relationships[otherPlayer.uid] = (playerToUpdate.relationships[otherPlayer.uid] || 0) + 1;
+                                otherPlayer.relationships[playerToUpdate.uid] = (otherPlayer.relationships[playerToUpdate.uid] || 0) + 1;
+                            }
+                        });
+                    }
+
                     let skipTurns = 0;
                     if (newSquare) {
                         skipTurns = newSquare.skipTurns || 0;
@@ -1453,8 +1469,13 @@ const app = initializeApp(firebaseConfig);
                         const allHaveRolled = allParticipants.every(uid => challengeState.participantsWhoRolled.includes(uid));
 
                         if (allHaveRolled) {
-                            const numParticipants = allParticipants.length;
-                            const rolls = allParticipants.map(uid => challengeState.rolls[uid]);
+                            const nonAdminParticipants = allParticipants.filter(uid => {
+                                const p = players.find(player => player.uid === uid);
+                                return p && !p.isAdmin;
+                            });
+
+                            const numParticipants = nonAdminParticipants.length;
+                            const rolls = nonAdminParticipants.map(uid => challengeState.rolls[uid]);
                             const totalRollScore = rolls.reduce((sum, r) => sum + r, 0);
                             const targetScore = numParticipants * 3;
 
@@ -1473,7 +1494,7 @@ const app = initializeApp(firebaseConfig);
                                 else meritChange = -5;
                             }
                             
-                            const resultsForNarrative = allParticipants.map(uid => ({
+                            const resultsForNarrative = nonAdminParticipants.map(uid => ({
                                 uid,
                                 name: players.find(p => p.uid === uid).name,
                                 roll: challengeState.rolls[uid]
@@ -1482,7 +1503,7 @@ const app = initializeApp(firebaseConfig);
                             const narrative = generateChallengeNarrative(resultsForNarrative, overallOutcome);
                             let resultSummary = `Tổng điểm gieo là <b>${totalRollScore}</b>, so với mục tiêu <b>${targetScore}</b>.<br><br>`;
                             
-                            allParticipants.forEach(uid => {
+                            nonAdminParticipants.forEach(uid => {
                                 const player = players.find(p => p.uid === uid);
                                 player.meritPoints += meritChange;
                                 const outcomeText = meritChange > 0 ? `<span class="text-green-600 font-bold">Thắng (+${meritChange} CĐ)</span>` :
@@ -1493,17 +1514,30 @@ const app = initializeApp(firebaseConfig);
                             
                             const fullMessage = `<div class="text-left">${resultSummary}<hr class="my-2"><p>${narrative}</p></div>`;
 
-                            allParticipants.forEach(uid => {
-                                players.find(p => p.uid === uid).notifications.push({
-                                    title: "Challenge Kết thúc",
+                            // BUG FIX: Send notification to participants AND the admin.
+                            const adminPlayer = players.find(p => p.isAdmin);
+
+                            nonAdminParticipants.forEach(uid => {
+                                const player = players.find(p => p.uid === uid);
+                                if (player) {
+                                    player.notifications.push({
+                                        title: "Challenge Kết thúc",
+                                        result: "",
+                                        message: fullMessage
+                                    });
+                                }
+                            });
+
+                            if (adminPlayer) {
+                                adminPlayer.notifications.push({
+                                    title: "Challenge Kết thúc (Quan sát)",
                                     result: "",
                                     message: fullMessage
                                 });
-                            });
+                            }
                             
                             roomData.challengeState = { isActive: false };
                             
-                            // The turn does NOT end here. The initiator continues their turn.
                             transaction.update(roomRef, {
                                 players: players,
                                 challengeState: roomData.challengeState,
