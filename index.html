@@ -120,8 +120,7 @@
             justify-content: space-between;
             align-items: center;
             gap: 10px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #d7c8a0;
+            padding-bottom: 0px;
         }
         .player-info { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         .player-icon { font-size: 1.5rem; }
@@ -830,7 +829,8 @@ const app = initializeApp(firebaseConfig);
                         turnsInHell: 0,
                         visitsToJambudvipa: 0,
                         totalMoves: 0,
-                        relationships: {}
+                        relationships: {},
+                        visitedSpecialRealms: [] // NEW: Track visited realms for bonuses
                     };
 
                     if (isCurrentUserAdmin) {
@@ -1061,6 +1061,16 @@ const app = initializeApp(firebaseConfig);
 
                 playerTurnDisplayEl.textContent = currentPlayer ? `Lượt của: ${currentPlayer.name} ${currentPlayer.icon}` : 'Chờ...';
                 
+                const clientRealm = getRealmCategory(clientPlayer.position);
+                // NEW: Change button text if in hell
+                if (clientRealm === 'hell') {
+                    rollDiceBtnEl.textContent = 'Sám hối';
+                    skipTurnBtnEl.textContent = 'Sám hối';
+                } else {
+                    rollDiceBtnEl.textContent = 'Vô Thường đến..';
+                    skipTurnBtnEl.textContent = 'Tiếp Tục Kiếp Sống';
+                }
+
                 if (isCurrentUserAdmin) {
                     rollDiceBtnEl.classList.add('hidden');
                     skipTurnBtnEl.classList.remove('hidden');
@@ -1078,12 +1088,10 @@ const app = initializeApp(firebaseConfig);
                         rollDiceBtnEl.classList.remove('hidden');
                         skipTurnBtnEl.classList.add('hidden');
                         rollDiceBtnEl.disabled = !isMyTurn;
-                        rollDiceBtnEl.textContent = 'Vô Thường đến..';
                     }
                 }
 
                 [requestSalvationBtnEl, practicePrayBtnEl, salvationBtnEl, challengeBtnEl].forEach(btn => btn.classList.add('hidden'));
-                const clientRealm = getRealmCategory(clientPlayer.position);
 
                 if (clientRealm === 'hell' && clientPlayer.skipTurnsRemaining > 0) {
                     requestSalvationBtnEl.classList.remove('hidden');
@@ -1122,6 +1130,56 @@ const app = initializeApp(firebaseConfig);
             }
         }
 
+        // NEW: Function to handle merit changes on landing
+        function applyLandingMerit(player, newPos, oldPos) {
+            let meritChange = 0;
+            let bonusMessage = "";
+
+            if (newPos === oldPos) return { player, meritChange, bonusMessage };
+
+            // I. Penalty for bad realms (applied every time)
+            const penaltyRealms = [10, 11, 21];
+            if (penaltyRealms.includes(newPos)) {
+                meritChange -= 10;
+                bonusMessage = `Bạn đã rơi vào đọa xứ, bị trừ 10 công đức.`;
+            }
+
+            // II. First-time bonuses
+            const visited = player.visitedSpecialRealms || [];
+            if (!visited.includes(newPos)) {
+                const tuTapSquares = [25, 33, 41, 42, 49, 50, 57, 58, 61, 66, 69, 72, 73, 74, 75, 81, 82, 83, 89, 90, 91, 52, 53, 54, 55, 56, 63, 64];
+                const tinhDoSquares = [26, 59, 60, 70, 76, 77, 85];
+                const boTatSquares = Array.from({length: 26}, (_, i) => i + 71).filter(n => ![72,73,74,75,76,77].includes(n)); // 71-96 excluding some
+                const chungDacSquares = [92, 93, 104];
+                
+                let awarded = false;
+                if (tuTapSquares.includes(newPos)) {
+                    meritChange += 5;
+                    bonusMessage = `Lần đầu bước vào Con Đường Tu Tập, bạn nhận được 5 công đức.`;
+                    awarded = true;
+                } else if (tinhDoSquares.includes(newPos)) {
+                    meritChange += 10;
+                    bonusMessage = `Lần đầu đến Cõi Tịnh Độ/Chuyển Luân Vương, bạn nhận được 10 công đức.`;
+                    awarded = true;
+                } else if (boTatSquares.includes(newPos)) {
+                    meritChange += 15;
+                    bonusMessage = `Lần đầu đạt đến Thánh Địa Bồ Tát, bạn nhận được 15 công đức.`;
+                    awarded = true;
+                } else if (chungDacSquares.includes(newPos)) {
+                    meritChange += 20;
+                    bonusMessage = `Chứng đắc thành tựu, bạn nhận được 20 công đức.`;
+                    awarded = true;
+                }
+
+                if (awarded) {
+                    player.visitedSpecialRealms.push(newPos);
+                }
+            }
+
+            player.meritPoints += meritChange;
+            return { player, meritChange, bonusMessage };
+        }
+
         async function proceedWithMove(roll, isPrayerRoll) {
             let newPlayersArray = JSON.parse(JSON.stringify(localGameState.players)); 
             let playerToUpdate = newPlayersArray.find(p => p.uid === currentUserId);
@@ -1134,19 +1192,20 @@ const app = initializeApp(firebaseConfig);
 
                 const oldPosition = playerToUpdate.position || 24;
                 const oldSquare = boardSquaresMap.get(oldPosition);
+                let meritChangeFromRoll = 0;
                 
                 if (isPrayerRoll) {
                     playerToUpdate.meritPoints -= 5;
                     playerToUpdate.diceRollHistory.push({ value: roll, type: 'prayer', isGoodRoll: false });
                 } else {
-                    const currentRealmCategory = getRealmCategory(oldPosition);
-                    const goodRealms = ['animal', 'asura', 'human', 'deva'];
-                    if (goodRealms.includes(currentRealmCategory) && (roll === 1 || roll === 2)) {
-                        isGoodRoll = true;
-                        const meritGained = (roll === 1 ? 2 : 1);
-                        playerToUpdate.meritPoints += meritGained;
-                        notification = { title: 'Tán thán Công đức!', result: `+${meritGained} công đức`, message: `Nhờ phước báu, bạn nhận được ${meritGained} công đức.` };
+                    // NEW: Merit from Dice Roll Logic
+                    switch(roll) {
+                        case 1: meritChangeFromRoll = 3; break;
+                        case 2: meritChangeFromRoll = 1; break;
+                        case 5: meritChangeFromRoll = -1; break;
+                        case 6: meritChangeFromRoll = -3; break;
                     }
+                    isGoodRoll = roll === 1 || roll === 2;
                     playerToUpdate.diceRollHistory.push({ value: roll, type: 'normal', isGoodRoll: isGoodRoll });
                 }
 
@@ -1155,8 +1214,23 @@ const app = initializeApp(firebaseConfig);
                     nextSquareNumber = oldSquare.moves[roll.toString()];
                 }
                 
+                // NEW: Special rule for rolling 6 into hell
+                if (!isPrayerRoll && roll === 6 && getRealmCategory(nextSquareNumber) === 'hell') {
+                    meritChangeFromRoll = -6;
+                }
+                playerToUpdate.meritPoints += meritChangeFromRoll;
+
+                // NEW: Apply landing merit changes
+                const landingMeritResult = applyLandingMerit(playerToUpdate, nextSquareNumber, oldPosition);
+                playerToUpdate = landingMeritResult.player;
+                
                 const newSquare = boardSquaresMap.get(nextSquareNumber);
-                notification.result = notification.result || `Gieo được ${roll}, đến cõi ${newSquare.name}`;
+                let meritChangeText = "";
+                const totalMeritChange = meritChangeFromRoll + landingMeritResult.meritChange;
+                if (totalMeritChange > 0) meritChangeText = `(+${totalMeritChange} CĐ)`;
+                if (totalMeritChange < 0) meritChangeText = `(${totalMeritChange} CĐ)`;
+
+                notification.result = `Gieo được ${roll}, đến cõi ${newSquare.name} ${meritChangeText}`;
                 
                 if (nextSquareNumber !== oldPosition) {
                     playerToUpdate.position = nextSquareNumber;
@@ -1165,41 +1239,34 @@ const app = initializeApp(firebaseConfig);
                         playerToUpdate.visitsToJambudvipa = (playerToUpdate.visitsToJambudvipa || 0) + 1;
                     }
 
-                    // BUG FIX 1: Update relationships on move
                     if (!playerToUpdate.isAdmin) {
                         newPlayersArray.forEach(otherPlayer => {
                             if (otherPlayer.uid !== playerToUpdate.uid && !otherPlayer.isAdmin && otherPlayer.position === nextSquareNumber) {
-                                // Initialize relationship objects if they don't exist
                                 if (!playerToUpdate.relationships) playerToUpdate.relationships = {};
                                 if (!otherPlayer.relationships) otherPlayer.relationships = {};
-
-                                // Increment count for both players
                                 playerToUpdate.relationships[otherPlayer.uid] = (playerToUpdate.relationships[otherPlayer.uid] || 0) + 1;
                                 otherPlayer.relationships[playerToUpdate.uid] = (otherPlayer.relationships[playerToUpdate.uid] || 0) + 1;
                             }
                         });
                     }
 
-                    let skipTurns = 0;
-                    if (newSquare) {
-                        skipTurns = newSquare.skipTurns || 0;
-                    }
+                    let skipTurns = newSquare ? newSquare.skipTurns || 0 : 0;
                     playerToUpdate.skipTurnsRemaining = skipTurns;
                     playerToUpdate.realmHistory.push({ pos: nextSquareNumber, type: 'normal', skip: skipTurns });
                     
                     const newRealmCategory = getRealmCategory(nextSquareNumber);
-                    if ([26, 62, 65, 67, 68, 69, 72].includes(nextSquareNumber)) { 
-                        const arrivalMerit = (nextSquareNumber === 26) ? 10 : 5;
-                        playerToUpdate.meritPoints += arrivalMerit;
-                        notification.title = 'Thành tựu!';
-                        notification.message = `Bạn đã trở thành Chuyển Luân/Trì Minh Vương và nhận ${arrivalMerit} công đức.`;
-                    } else if (newRealmCategory === 'hell' || newRealmCategory === 'preta') {
+                    if (newRealmCategory === 'hell' || newRealmCategory === 'preta') {
                         notification.title = 'Quả báo đã trổ!';
-                    } else if (newRealmCategory === 'deva' || newRealmCategory === 'pureland') {
+                    } else if (newRealmCategory === 'deva' || newRealmCategory === 'pureland' || landingMeritResult.meritChange > 0) {
                         notification.title = 'Chúc mừng!';
                     }
                 }
-                notification.message = notification.message || generateKarmaSummary(oldSquare, newSquare, roll);
+                
+                let finalMessage = generateKarmaSummary(oldSquare, newSquare, roll);
+                if (landingMeritResult.bonusMessage) {
+                    finalMessage += `<br><b>${landingMeritResult.bonusMessage}</b>`;
+                }
+                notification.message = finalMessage;
             }
             
             let nextPlayerIndex = (localGameState.currentPlayerIndex + 1) % newPlayersArray.length;
@@ -1514,7 +1581,6 @@ const app = initializeApp(firebaseConfig);
                             
                             const fullMessage = `<div class="text-left">${resultSummary}<hr class="my-2"><p>${narrative}</p></div>`;
 
-                            // BUG FIX: Send notification to participants AND the admin.
                             const adminPlayer = players.find(p => p.isAdmin);
 
                             nonAdminParticipants.forEach(uid => {
@@ -1638,18 +1704,11 @@ const app = initializeApp(firebaseConfig);
             let newPlayersArray = JSON.parse(JSON.stringify(localGameState.players)); 
             let playerToUpdate = newPlayersArray.find(p => p.name.toLowerCase() === playerName.toLowerCase());
             if (playerToUpdate) {
-                // Clear previous skip turns
                 playerToUpdate.skipTurnsRemaining = 0;
-
-                // Get new square data
                 const newSquare = boardSquaresMap.get(newPosition);
                 const newSkipTurns = newSquare ? (newSquare.skipTurns || 0) : 0;
-
-                // Apply new position and new skip turns
                 playerToUpdate.position = newPosition;
                 playerToUpdate.skipTurnsRemaining = newSkipTurns;
-
-                // Update history correctly
                 playerToUpdate.realmHistory.push({ pos: newPosition, type: 'manual', skip: newSkipTurns });
             } else {
                 alert(`Không tìm thấy người chơi "${playerName}".`);
